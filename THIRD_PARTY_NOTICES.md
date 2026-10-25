@@ -9,6 +9,7 @@
 - 关系：本项目为 HarmonyOS / ArkTS 的独立实现，参照上游信息架构、交互与视觉设计；
   不分发上游 Android 代码、二进制或模型。
 - 上游版权归其作者与贡献者所有；本项目保留该归属说明，并以 LGPL-3.0 发布自身代码，便于遵循同类许可义务。
+- 上游 Android 工程另含 RTranslator、RapidOCR、ONNX Runtime、manga-ocr 等第三方组件（详见上游仓库 `licenses/NOTICE.txt`）。本仓库未整合上游 Android 原生实现及其依赖，因此不随本仓库分发这些组件，其许可义务由上游/各自项目承担。
 
 ## 2. llama.cpp — MIT
 
