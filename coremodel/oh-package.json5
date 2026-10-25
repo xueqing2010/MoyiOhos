@@ -1,0 +1,9 @@
+{
+  "name": "coremodel",
+  "version": "1.0.0",
+  "description": "StarFlow data model: entities, RdbHelper, DAOs",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

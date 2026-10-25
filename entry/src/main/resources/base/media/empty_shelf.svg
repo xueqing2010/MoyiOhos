@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+<defs>
+  <linearGradient id="bk1" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#C4B5FD"/><stop offset="1" stop-color="#7C5CE0"/>
+  </linearGradient>
+  <linearGradient id="bk2" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0" stop-color="#A78BFA"/><stop offset="1" stop-color="#5B21B6"/>
+  </linearGradient>
+  <linearGradient id="bk3" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#6D4DD0"/><stop offset="1" stop-color="#2C1B52"/>
+  </linearGradient>
+</defs>
+<circle cx="80" cy="86" r="64.0" fill="#7C5CE0" opacity="0.09"/><circle cx="80" cy="86" r="46.08" fill="#7C5CE0" opacity="0.09"/><circle cx="80" cy="86" r="29.44" fill="#7C5CE0" opacity="0.10"/>
+<ellipse cx="80" cy="128" rx="54" ry="6" fill="#0B0813" opacity="0.5"/>
+<rect x="18" y="118" width="124" height="6" rx="3" fill="#2A1F49"/>
+<rect x="18" y="118" width="124" height="2" rx="1" fill="#43316F"/>
+<rect x="42" y="84" width="30" height="34" rx="5" fill="url(#bk1)"/>
+<rect x="46" y="89" width="2.4" height="24" rx="1.2" fill="#EDE8FA" opacity="0.55"/>
+<path d="M60 96L61.65 100.73L66.66 100.84L62.66 103.87L64.11 108.66L60 105.8L55.89 108.66L57.34 103.87L53.34 100.84L58.35 100.73Z" fill="#EDE8FA" opacity="0.92"/>
+<rect x="76" y="76" width="34" height="42" rx="5" fill="url(#bk2)"/>
+<rect x="80" y="81" width="2.4" height="32" rx="1.2" fill="#EDE8FA" opacity="0.35"/>
+<circle cx="93" cy="96" r="7.4" fill="none" stroke="#C4B5FD" stroke-width="1.6" opacity="0.8"/>
+<rect x="87" y="109" width="14" height="2.2" rx="1.1" fill="#C4B5FD" opacity="0.55"/>
+<rect x="114" y="92" width="22" height="26" rx="4" fill="url(#bk3)"/>
+<rect x="117" y="96" width="2" height="18" rx="1" fill="#EDE8FA" opacity="0.3"/>
+<circle cx="126" cy="105" r="3.2" fill="#C4B5FD" opacity="0.85"/>
+<path d="M30 50L31.36 56.64L38 58L31.36 59.36L30 66L28.64 59.36L22 58L28.64 56.64Z" fill="#C4B5FD" opacity="0.85"/>
+<path d="M134 56.6L134.92 61.08L139.4 62L134.92 62.92L134 67.4L133.08 62.92L128.6 62L133.08 61.08Z" fill="#A78BFA" opacity="0.9"/>
+<circle cx="48" cy="52" r="2" fill="#C4B5FD" opacity="0.6"/>
+<circle cx="100" cy="54" r="1.6" fill="#A78BFA" opacity="0.6"/>
+<rect x="96" y="56" width="16" height="12" rx="2" fill="#EDE8FA" opacity="0.9"/>
+<path d="M99 60h9M99 63.4h6.4" stroke="#7C5CE0" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.9"/>
+</svg>

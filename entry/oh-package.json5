@@ -1,0 +1,17 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "StarFlow HarmonyOS entry HAP",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "commons": "file:../commons",
+    "coremodel": "file:../coremodel",
+    "coreocr": "file:../coreocr",
+    "coretranslate": "file:../coretranslate",
+    "corerender": "file:../corerender",
+    "corenovel": "file:../corenovel",
+    "libllamacpp": "file:./src/main/cpp/types/libllamacpp"
+  }
+}

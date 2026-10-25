@@ -1,0 +1,9 @@
+{
+  "name": "libllamacpp",
+  "version": "1.0.0",
+  "description": "llama.cpp NAPI bridge (StarFlowOhos)",
+  "main": "",
+  "author": "",
+  "license": "",
+  "types": "./index.d.ets"
+}

@@ -1,0 +1,131 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "鸿蒙漫画翻译工作台"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "星译：漫画·小说·文本翻译"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "星译 StarFlow"
+    },
+    {
+      "name": "tab_shelf",
+      "value": "漫画"
+    },
+    {
+      "name": "tab_translate",
+      "value": "翻译"
+    },
+    {
+      "name": "tab_me",
+      "value": "我的"
+    },
+    {
+      "name": "me_title",
+      "value": "我的"
+    },
+    {
+      "name": "me_model_manager",
+      "value": "模型管理"
+    },
+    {
+      "name": "me_model_manager_desc",
+      "value": "GGUF 模型下载与管理"
+    },
+    {
+      "name": "me_workbench",
+      "value": "尖刀验证工作台"
+    },
+    {
+      "name": "me_workbench_desc",
+      "value": "7 项技术验证与最近结果"
+    },
+    {
+      "name": "me_about",
+      "value": "关于"
+    },
+    {
+      "name": "me_about_desc",
+      "value": "版本、模块清单与许可说明"
+    },
+    {
+      "name": "spike_title",
+      "value": "尖刀验证工作台"
+    },
+    {
+      "name": "spike_status_not_run",
+      "value": "未执行"
+    },
+    {
+      "name": "spike_status_pass",
+      "value": "通过"
+    },
+    {
+      "name": "spike_status_fail",
+      "value": "失败"
+    },
+    {
+      "name": "spike_status_degraded",
+      "value": "降级"
+    },
+    {
+      "name": "spike_run_p01",
+      "value": "执行验证"
+    },
+    {
+      "name": "spike_last_run",
+      "value": "最近执行"
+    },
+    {
+      "name": "spike_last_run_at",
+      "value": "最近执行：%s"
+    },
+    {
+      "name": "spike_never_run",
+      "value": "尚未执行"
+    },
+    {
+      "name": "about_title",
+      "value": "关于"
+    },
+    {
+      "name": "about_version",
+      "value": "版本"
+    },
+    {
+      "name": "about_modules",
+      "value": "模块清单（P0-1）"
+    },
+    {
+      "name": "about_license",
+      "value": "许可与来源"
+    },
+    {
+      "name": "empty_shelf_title",
+      "value": "还没有漫画"
+    },
+    {
+      "name": "empty_shelf_hint",
+      "value": "导入 zip/cbz、图片目录或相册图片（US-2 接入）"
+    },
+    {
+      "name": "empty_translate_title",
+      "value": "文本翻译"
+    },
+    {
+      "name": "empty_translate_hint",
+      "value": "必应与 OpenAI 兼容引擎（US-8 接入）"
+    },
+    { "name": "tab_import", "value": "导入" },
+    { "name": "tab_history", "value": "历史" },
+    { "name": "tab_shelf_books", "value": "书架" },
+    { "name": "tab_shelf_manga", "value": "漫画" },
+    { "name": "tab_shelf_novel", "value": "小说" },
+    { "name": "app_title", "value": "星译" },
+    { "name": "app_slogan", "value": "漫画 · 小说 · 文本翻译" }
+  ]
+}

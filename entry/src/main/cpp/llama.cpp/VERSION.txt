@@ -1,0 +1,2 @@
+﻿llama.cpp master archive (codeload.github.com, 2026-10-05); obtained as zip archive (local git unavailable per spec assumption).
+OHOS/musl patch (StarFlowOhos T041): scoped glibc-only CPU affinity/NUMA guards to also require __GLIBC__ (ggml/src/ggml.c:1 site, ggml/src/ggml-cpu/ggml-cpu.c:6 sites) so OHOS clang (which defines __gnu_linux__/__linux__ but has musl libc) falls back to the no-op thread-affinity stubs. Build verified: assembleHap SUCCESS for arm64-v8a + x86_64; libllamacpp.so produced.

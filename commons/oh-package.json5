@@ -1,0 +1,9 @@
+{
+  "name": "commons",
+  "version": "1.0.0",
+  "description": "StarFlow common utilities: theme tokens, logging, natural sort",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

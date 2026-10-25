@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+<defs>
+</defs>
+<circle cx="74" cy="70" r="64.0" fill="#7C5CE0" opacity="0.09"/><circle cx="74" cy="70" r="46.08" fill="#7C5CE0" opacity="0.09"/><circle cx="74" cy="70" r="29.44" fill="#7C5CE0" opacity="0.10"/>
+<path d="M98 94l26 26" stroke="#7C5CE0" stroke-width="13" stroke-linecap="round" fill="none"/>
+<path d="M98 94l26 26" stroke="#A78BFA" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.55"/>
+<circle cx="70" cy="66" r="37" fill="#1A1230" stroke="#A78BFA" stroke-width="6"/>
+<circle cx="70" cy="66" r="30" fill="#221A38" opacity="0.85"/>
+<rect x="53" y="48" width="34" height="36" rx="4" fill="#EAE3FF"/>
+<path d="M60 58h20M60 65h20M60 72h14" stroke="#7C5CE0" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.7"/>
+<path d="M78 73.4L78.78 77.22L82.6 78L78.78 78.78L78 82.6L77.22 78.78L73.4 78L77.22 77.22Z" fill="#A78BFA" opacity="0.85"/>
+<path d="M30 37L31.19 42.81L37 44L31.19 45.19L30 51L28.81 45.19L23 44L28.81 42.81Z" fill="#C4B5FD" opacity="0.9"/>
+<path d="M136 42.6L136.92 47.08L141.4 48L136.92 48.92L136 53.4L135.08 48.92L130.6 48L135.08 47.08Z" fill="#A78BFA" opacity="0.85"/>
+<circle cx="140" cy="96" r="2.2" fill="#C4B5FD" opacity="0.6"/>
+<circle cx="34" cy="108" r="2" fill="#A78BFA" opacity="0.55"/>
+</svg>

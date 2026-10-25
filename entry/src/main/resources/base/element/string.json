@@ -1,0 +1,131 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "StarFlow comic translation workbench for HarmonyOS"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "星译：漫画·小说·文本翻译"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "星译 StarFlow"
+    },
+    {
+      "name": "tab_shelf",
+      "value": "Comics"
+    },
+    {
+      "name": "tab_translate",
+      "value": "Translate"
+    },
+    {
+      "name": "tab_me",
+      "value": "Me"
+    },
+    {
+      "name": "me_title",
+      "value": "Me"
+    },
+    {
+      "name": "me_model_manager",
+      "value": "Model Manager"
+    },
+    {
+      "name": "me_model_manager_desc",
+      "value": "GGUF model download and management"
+    },
+    {
+      "name": "me_workbench",
+      "value": "Spike Workbench"
+    },
+    {
+      "name": "me_workbench_desc",
+      "value": "7 technical verification items and their latest status"
+    },
+    {
+      "name": "me_about",
+      "value": "About"
+    },
+    {
+      "name": "me_about_desc",
+      "value": "Version, module manifest and licenses"
+    },
+    {
+      "name": "spike_title",
+      "value": "Spike Workbench"
+    },
+    {
+      "name": "spike_status_not_run",
+      "value": "Not run"
+    },
+    {
+      "name": "spike_status_pass",
+      "value": "PASS"
+    },
+    {
+      "name": "spike_status_fail",
+      "value": "FAIL"
+    },
+    {
+      "name": "spike_status_degraded",
+      "value": "Degraded"
+    },
+    {
+      "name": "spike_run_p01",
+      "value": "Run verification"
+    },
+    {
+      "name": "spike_last_run",
+      "value": "Last run"
+    },
+    {
+      "name": "spike_last_run_at",
+      "value": "Last run: %s"
+    },
+    {
+      "name": "spike_never_run",
+      "value": "Not executed yet"
+    },
+    {
+      "name": "about_title",
+      "value": "About"
+    },
+    {
+      "name": "about_version",
+      "value": "Version"
+    },
+    {
+      "name": "about_modules",
+      "value": "Module manifest (P0-1)"
+    },
+    {
+      "name": "about_license",
+      "value": "Licenses and sources"
+    },
+    {
+      "name": "empty_shelf_title",
+      "value": "No comics yet"
+    },
+    {
+      "name": "empty_shelf_hint",
+      "value": "Import zip/cbz, image folder or album photos (US-2)"
+    },
+    {
+      "name": "empty_translate_title",
+      "value": "Text translate"
+    },
+    {
+      "name": "empty_translate_hint",
+      "value": "Bing and OpenAI-compatible engines (US-8)"
+    },
+    { "name": "tab_import", "value": "Import" },
+    { "name": "tab_history", "value": "History" },
+    { "name": "tab_shelf_books", "value": "Shelf" },
+    { "name": "tab_shelf_manga", "value": "Comics" },
+    { "name": "tab_shelf_novel", "value": "Novels" },
+    { "name": "app_title", "value": "StarFlow" },
+    { "name": "app_slogan", "value": "Comics · Novels · Text translation" }
+  ]
+}

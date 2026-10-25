@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "com.moe.starflow",
+    "vendor": "StarFlowOhos",
+    "versionCode": 1010000,
+    "versionName": "1.1.0",
+    "icon": "$media:layered_image",
+    "label": "$string:app_name"
+  }
+}

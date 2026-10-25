@@ -1,0 +1,12 @@
+{
+  "name": "coreocr",
+  "version": "1.0.0",
+  "description": "StarFlow OCR service based on Core Vision Kit textRecognition",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "commons": "file:../commons",
+    "coremodel": "file:../coremodel"
+  }
+}

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160">
+<defs>
+  <linearGradient id="c" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0" stop-color="#2A1F49"/><stop offset="1" stop-color="#0B0813"/>
+  </linearGradient>
+</defs>
+<rect width="120" height="160" rx="10" fill="url(#c)"/>
+<ellipse cx="88" cy="30" rx="58" ry="50" fill="#EDE8FA" opacity="0.09"/>
+<path d="M-6 128L62 24h16L10 128z" fill="#7C5CE0" opacity="0.22"/>
+<path d="M18 138L86 34h12L44 138z" fill="#A78BFA" opacity="0.14"/>
+<path d="M42 148L110 44h8L70 148z" fill="#7C5CE0" opacity="0.18"/>
+<path d="M60 31L65.17 44.88L79.97 45.51L68.37 54.72L72.34 68.99L60 60.8L47.66 68.99L51.63 54.72L40.03 45.51L54.83 44.88Z" fill="#C4B5FD" opacity="0.95"/>
+<path d="M88 87L88.85 91.15L93 92L88.85 92.85L88 97L87.15 92.85L83 92L87.15 91.15Z" fill="#A78BFA" opacity="0.9"/>
+<path d="M30 25.6L30.75 29.25L34.4 30L30.75 30.75L30 34.4L29.25 30.75L25.6 30L29.25 29.25Z" fill="#C4B5FD" opacity="0.7"/>
+<rect x="20" y="116" width="80" height="7" rx="3.5" fill="#EDE8FA" opacity="0.85"/>
+<rect x="20" y="129" width="52" height="5" rx="2.5" fill="#EDE8FA" opacity="0.38"/>
+<rect x="0.8" y="0.8" width="118.4" height="158.4" rx="9.4" fill="none" stroke="#A78BFA" stroke-width="1.2" opacity="0.18"/>
+</svg>

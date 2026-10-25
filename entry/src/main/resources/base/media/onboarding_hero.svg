@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+<defs>
+  <linearGradient id="st" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#E9E2FF"/><stop offset="0.55" stop-color="#A78BFA"/><stop offset="1" stop-color="#6D4DD0"/>
+  </linearGradient>
+  <linearGradient id="bk1" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#C4B5FD"/><stop offset="1" stop-color="#5B21B6"/>
+  </linearGradient>
+  <linearGradient id="bk2" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0" stop-color="#7C5CE0"/><stop offset="1" stop-color="#2C1B52"/>
+  </linearGradient>
+</defs>
+<circle cx="160" cy="98" r="108.0" fill="#7C5CE0" opacity="0.09"/><circle cx="160" cy="98" r="77.76" fill="#7C5CE0" opacity="0.09"/><circle cx="160" cy="98" r="49.68" fill="#7C5CE0" opacity="0.10"/>
+<ellipse cx="160" cy="100" rx="118" ry="44" fill="none" stroke="#7C5CE0" stroke-width="2" opacity="0.32"/>
+<circle cx="160" cy="96" r="58" fill="none" stroke="#A78BFA" stroke-width="2" opacity="0.35"/>
+<path d="M160 52L170.58 81.44L201.85 82.4L177.12 101.56L185.86 131.6L160 114L134.14 131.6L142.88 101.56L118.15 82.4L149.42 81.44Z" fill="url(#st)"/>
+<path d="M58 152c26-17 42-17 62 0s36 13 56-2 34-10 52 8" stroke="#A78BFA" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.55"/>
+<g>
+  <rect x="52" y="104" width="32" height="44" rx="5" fill="url(#bk1)"/>
+  <rect x="56" y="109" width="2.4" height="32" rx="1.2" fill="#EDE8FA" opacity="0.5"/>
+  <path d="M70 117.5L71.53 121.9L76.18 121.99L72.47 124.8L73.82 129.26L70 126.6L66.18 129.26L67.53 124.8L63.82 121.99L68.47 121.9Z" fill="#EDE8FA" opacity="0.9"/>
+</g>
+<g>
+  <rect x="234" y="96" width="38" height="54" rx="6" fill="url(#bk2)"/>
+  <rect x="239" y="102" width="2.6" height="40" rx="1.3" fill="#EDE8FA" opacity="0.32"/>
+  <circle cx="253" cy="120" r="7" fill="none" stroke="#C4B5FD" stroke-width="1.8" opacity="0.8"/>
+  <rect x="245" y="134" width="16" height="2.4" rx="1.2" fill="#C4B5FD" opacity="0.5"/>
+</g>
+<path d="M40 50L41.36 56.64L48 58L41.36 59.36L40 66L38.64 59.36L32 58L38.64 56.64Z" fill="#C4B5FD" opacity="0.9"/>
+<path d="M278 45L279.19 50.81L285 52L279.19 53.19L278 59L276.81 53.19L271 52L276.81 50.81Z" fill="#A78BFA" opacity="0.9"/>
+<path d="M120 29L120.85 33.15L125 34L120.85 34.85L120 39L119.15 34.85L115 34L119.15 33.15Z" fill="#C4B5FD" opacity="0.8"/>
+<path d="M214 27.6L214.75 31.25L218.4 32L214.75 32.75L214 36.4L213.25 32.75L209.6 32L213.25 31.25Z" fill="#A78BFA" opacity="0.8"/>
+<circle cx="160" cy="168" r="2.4" fill="#A78BFA" opacity="0.55"/>
+<circle cx="92" cy="72" r="1.8" fill="#C4B5FD" opacity="0.5"/>
+<circle cx="230" cy="74" r="1.8" fill="#C4B5FD" opacity="0.5"/>
+</svg>

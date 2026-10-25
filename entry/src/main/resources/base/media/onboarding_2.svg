@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+<defs>
+  <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#8B6BE8"/><stop offset="1" stop-color="#3B2470"/>
+  </linearGradient>
+  <linearGradient id="bk1" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#C4B5FD"/><stop offset="1" stop-color="#6D4DD0"/>
+  </linearGradient>
+  <linearGradient id="bk2" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0" stop-color="#7C5CE0"/><stop offset="1" stop-color="#2C1B52"/>
+  </linearGradient>
+</defs>
+<circle cx="160" cy="122" r="112.0" fill="#7C5CE0" opacity="0.09"/><circle cx="160" cy="122" r="80.64" fill="#7C5CE0" opacity="0.09"/><circle cx="160" cy="122" r="51.52" fill="#7C5CE0" opacity="0.10"/>
+<path d="M96 96c0-4.4 3.6-8 8-8h36l12 12h60c4.4 0 8 3.6 8 8v46c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12V96z" fill="url(#fold)"/>
+<path d="M94 116c0-4.4 3.6-8 8-8h116c4.4 0 8 3.6 8 8v38c0 6.6-5.4 12-12 12H106c-6.6 0-12-5.4-12-12v-38z" fill="#2C1B52"/>
+<path d="M94 116c0-4.4 3.6-8 8-8h116c4.4 0 8 3.6 8 8v4H94v-4z" fill="#43316F" opacity="0.9"/>
+<path d="M160 40v32" stroke="#C4B5FD" stroke-width="8" stroke-linecap="round" fill="none"/>
+<path d="M147 66h26l-13 18-13-18z" fill="#C4B5FD"/>
+<rect x="44" y="108" width="30" height="42" rx="5" fill="url(#bk1)"/>
+<rect x="48" y="113" width="2.4" height="30" rx="1.2" fill="#EDE8FA" opacity="0.45"/>
+<path d="M59 122L60.41 126.06L64.71 126.15L61.28 128.74L62.53 132.85L59 130.4L55.47 132.85L56.72 128.74L53.29 126.15L57.59 126.06Z" fill="#EDE8FA" opacity="0.88"/>
+<rect x="248" y="100" width="32" height="46" rx="5" fill="url(#bk2)"/>
+<rect x="252" y="105" width="2.4" height="34" rx="1.2" fill="#EDE8FA" opacity="0.3"/>
+<circle cx="263" cy="120" r="6" fill="none" stroke="#C4B5FD" stroke-width="1.6" opacity="0.75"/>
+<rect x="190" y="26" width="30" height="36" rx="6" fill="#5B21B6" stroke="#C4B5FD" stroke-width="1.6"/>
+<rect x="203" y="32" width="4" height="5" rx="1" fill="#C4B5FD"/>
+<rect x="203" y="40" width="4" height="5" rx="1" fill="#C4B5FD"/>
+<rect x="200" y="48" width="10" height="6" rx="1.6" fill="#C4B5FD"/>
+<path d="M38 38L39.36 44.64L46 46L39.36 47.36L38 54L36.64 47.36L30 46L36.64 44.64Z" fill="#C4B5FD" opacity="0.9"/>
+<path d="M282 46L283.02 50.98L288 52L283.02 53.02L282 58L280.98 53.02L276 52L280.98 50.98Z" fill="#A78BFA" opacity="0.85"/>
+<path d="M122 29.4L122.78 33.22L126.6 34L122.78 34.78L122 38.6L121.22 34.78L117.4 34L121.22 33.22Z" fill="#A78BFA" opacity="0.8"/>
+<circle cx="160" cy="58" r="2.2" fill="#A78BFA" opacity="0.6"/>
+</svg>

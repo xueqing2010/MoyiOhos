@@ -1,0 +1,38 @@
+# ---- HarmonyOS / DevEco Studio 构建产物 ----
+/node_modules
+/oh_modules
+**/oh_modules
+/local.properties
+/.idea
+/.idea/
+/.hvigor
+**/.hvigor
+**/build
+.cxx
+**/.cxx
+**/.test
+/.appanalyzer
+/.cache
+/.clangd
+/.clang-format
+/.clang-tidy
+*.har
+*.hap
+*.hsp
+
+# ---- 签名与密钥（严禁提交）----
+*.p12
+*.cer
+*.p7b
+*.csr
+*.keystore
+*.jks
+*.pem
+*.key
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+.vscode/
