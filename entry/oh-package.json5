@@ -13,5 +13,7 @@
     "corerender": "file:../corerender",
     "corenovel": "file:../corenovel",
     "libllamacpp": "file:./src/main/cpp/types/libllamacpp"
-  }
+  },
+  "devDependencies": {},
+  "dynamicDependencies": {}
 }

@@ -1,4 +1,5 @@
 import { uiMaterial } from '@kit.ArkUI';
+import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { ThemeTokens, WindowSizeClass, observeBreakpoint } from 'commons';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 
@@ -44,7 +45,7 @@ struct ThemeSettingCard {
 
 /**
  * 主题外观页（S110 设置侧）：紫夜深色（默认）/ 紫夜纯黑 OLED / 跟随系统，
- * 含动态取色说明。诚实标注：当前版本运行时固定紫夜，选择仅持久化偏好。
+ * 运行时切换色板并重建 shell；蓝白为浅色，紫夜/OLED 为深色。
  */
 @Component
 export struct SettingsThemePage {
@@ -55,9 +56,11 @@ export struct SettingsThemePage {
   private options: Array<ThemeOption> = [
     new ThemeOption('purple', '紫夜深色（默认）', '深紫夜色底 + 紫罗兰主色，低蓝光阅读，全应用统一。', true,
       ThemeTokens.READER_BG_NOCTURNE),
-    new ThemeOption('oled', '紫夜纯黑 OLED', '纯黑底更省电，适合 OLED 屏幕与夜间阅读；当前版本仅记录偏好。', true,
+    new ThemeOption('blue', '蓝白配色', '明亮蓝白 + 清晰蓝主色，适合白天与办公；切换后立即重建界面。', true,
+      '#F5F9FF'),
+    new ThemeOption('oled', '紫夜纯黑 OLED', '纯黑底更省电，适合 OLED 屏幕与夜间阅读；保存后重启生效。', true,
       ThemeTokens.READER_BG_BLACK),
-    new ThemeOption('system', '跟随系统', '随系统深色/浅色切换；当前版本仅记录偏好。', true,
+    new ThemeOption('system', '跟随系统', '当前固定深色；保留偏好位，后续版本再跟随系统深浅色。', true,
       ThemeTokens.SURFACE_SECONDARY)
   ];
 
@@ -81,11 +84,24 @@ export struct SettingsThemePage {
 
   private async pickTheme(id: string): Promise<void> {
     this.themeMode = id;
+    // 1) 内存色板立即切换；2) 持久化；3) 通知 shell 重建全部页面读取新 token。
+    ThemeTokens.applyMode(id);
     await SettingsRepository.set(SettingsKeys.THEME_MODE, id);
-    this.hint = '主题偏好已保存';
+    AppStorage.setOrCreate('starflow_theme_mode', id);
+    const rev: number = AppStorage.get<number>('starflow_theme_rev') ?? 0;
+    AppStorage.setOrCreate('starflow_theme_rev', rev + 1);
+    try {
+      const ctx = getContext(this) as common.UIAbilityContext;
+      await ctx.getApplicationContext().setColorMode(id === 'blue'
+        ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT
+        : ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
+    } catch (e) {
+      // 系统栏/弹窗深浅色是增强项，失败不影响应用内配色。
+    }
+    this.hint = id === 'blue' ? '蓝白配色已启用' : '主题已切换';
     setTimeout(() => {
       this.hint = '';
-    }, 1400);
+    }, 1600);
   }
 
   private isWide(): boolean {
@@ -170,7 +186,7 @@ export struct SettingsThemePage {
             .fontSize(ThemeTokens.FONT_SUBTITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor(ThemeTokens.TEXT_PRIMARY)
-          Text('紫夜阅读 · 低蓝光')
+          Text(ThemeTokens.isLight() ? '蓝白阅读 · 明亮' : '紫夜阅读 · 低蓝光')
             .fontSize(ThemeTokens.FONT_SMALL)
             .fontColor(ThemeTokens.TEXT_SECONDARY)
           Text('主按钮')
@@ -186,7 +202,7 @@ export struct SettingsThemePage {
         .backgroundColor(ThemeTokens.SURFACE_VARIANT)
       }
       .width('100%')
-      Text('预览使用当前固定紫夜的色板；选择其他主题会在后续版本应用。')
+      Text('预览使用当前色板；选择蓝白配色后返回即可看到全应用重建。')
         .fontSize(ThemeTokens.FONT_SMALL)
         .fontColor(ThemeTokens.TEXT_HINT)
         .width('100%')
@@ -206,7 +222,7 @@ export struct SettingsThemePage {
                   .fontSize(ThemeTokens.FONT_TITLE)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(ThemeTokens.TEXT_PRIMARY)
-                Text('紫夜阅读设计语言 · 沉浸光感材质')
+                Text(ThemeTokens.isLight() ? '蓝白沉浸光感 · 明亮阅读' : '紫夜阅读设计语言 · 沉浸光感材质')
                   .fontSize(ThemeTokens.FONT_SMALL)
                   .fontColor(ThemeTokens.TEXT_HINT)
               }
@@ -221,7 +237,7 @@ export struct SettingsThemePage {
             }
             .width('100%')
 
-            this.sectionTitle('主题模式', '选择应用配色；当前版本运行时固定紫夜深色')
+            this.sectionTitle('主题模式', '选择应用配色；蓝白配色切换后立即重建界面')
             ThemeSettingCard() {
               ForEach(this.options, (opt: ThemeOption) => {
                 this.optionRow({ opt: opt, active: this.themeMode === opt.id })
@@ -234,7 +250,7 @@ export struct SettingsThemePage {
 
             this.sectionTitle('说明', '关于主题能力的边界，避免误解')
             ThemeSettingCard() {
-              this.noteRow('当前版本固定紫夜', '应用配色在编译期固定为紫夜深色（Purple Nocturne）；上面的选择会保存，但不会立即切换全局配色。')
+              this.noteRow('运行时切换', '色板由 ThemeTokens.applyMode() 在运行时切换，选择后重建页面外壳；系统栏颜色在下次启动时完全同步。')
               Divider()
                 .color(ThemeTokens.DIVIDER)
                 .strokeWidth(0.5)

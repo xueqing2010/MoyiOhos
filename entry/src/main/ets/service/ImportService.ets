@@ -109,6 +109,61 @@ export class ImportService {
     return result;
   }
 
+  /**
+   * 拖入导入 / 碰一碰导入的统一入口：按扩展名把 URI 分成压缩包、图片、目录，
+   * 复用既有 stage→commit 流程；返回成功导入的漫画列表。
+   */
+  static async importDropped(uris: Array<string>,
+    onProgress: (p: ImportProgress) => void): Promise<Array<Manga>> {
+    const out: Array<Manga> = [];
+    const archives: Array<string> = [];
+    const images: Array<string> = [];
+    const dirs: Array<string> = [];
+    for (const uri of uris) {
+      const ext = ImportService.extOf(uri);
+      if (ext === '.zip' || ext === '.cbz' || ext === '.rar' || ext === '.7z') {
+        archives.push(uri);
+      } else if (ImportService.isImageExt(ext)) {
+        images.push(uri);
+      } else if (uri.endsWith('/') || uri.indexOf('/tree/') > 0 || uri.indexOf('datashare://') === 0) {
+        dirs.push(uri);
+      }
+    }
+    for (const uri of archives) {
+      try {
+        const name = ImportService.archiveDisplayName(uri);
+        const manga = await ImportService.importOneArchive(uri, name, onProgress, () => false);
+        if (manga !== undefined) {
+          out.push(manga);
+        }
+      } catch (e) {
+        Log.warn(TAG, 'dropped archive failed: ' + ImportService.readableError(e));
+      }
+    }
+    if (images.length > 0) {
+      try {
+        const staged = await ImportService.stagePhotos(images, onProgress);
+        const name = '拖入导入 ' + ImportService.shortDate(Date.now());
+        out.push(await ImportService.commitStaged(staged, name, 0, onProgress));
+      } catch (e) {
+        Log.warn(TAG, 'dropped images failed: ' + ImportService.readableError(e));
+      }
+    }
+    for (const uri of dirs) {
+      try {
+        out.push(await ImportService.importDirectory(uri));
+      } catch (e) {
+        Log.warn(TAG, 'dropped directory failed: ' + ImportService.readableError(e));
+      }
+    }
+    return out;
+  }
+
+  static isImageExt(ext: string): boolean {
+    return ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp'
+      || ext === '.bmp' || ext === '.gif' || ext === '.heic' || ext === '.avif';
+  }
+
   /** 单包导入（向导外的直通路径）。取消时返回 undefined（暂存/临时记录已清理）。 */
   private static async importOneArchive(uri: string, name: string,
     onProgress: (p: ImportProgress) => void, isCancelled: () => boolean): Promise<Manga | undefined> {

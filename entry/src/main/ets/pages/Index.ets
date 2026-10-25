@@ -1,4 +1,4 @@
-import { uiMaterial } from '@kit.ArkUI';
+import { uiMaterial, window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import {
   ThemeTokens,
@@ -10,7 +10,9 @@ import {
 } from 'commons';
 import { AppEnv } from '../common/AppEnv';
 import { Routes } from '../common/Routes';
-import { SettingsRepository } from '../data/SettingsRepository';
+import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
+import { ShareService } from '../service/ShareService';
+import { promptAction } from '@kit.ArkUI';
 import { ShelfView } from '../views/ShelfView';
 import { ImportView } from '../views/ImportView';
 import { TextTranslateView } from '../views/TextTranslateView';
@@ -54,12 +56,29 @@ import { TextHistoryPage } from '../pages/TextHistoryPage';
 struct Index {
   @State currentTab: number = 0;
   @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
+  /** 主题版本：蓝白/紫夜切换后 +1，用 key 重建整个 shell 让所有页面重读色板。 */
+  @StorageLink('starflow_theme_rev') @Watch('onThemeRev') themeRev: number = 0;
+  @StorageLink('starflow_theme_mode') themeMode: string = 'purple';
   private immersiveSupported: boolean = false;
   private navStack: NavPathStack = AppEnv.getInstance().navStack;
   private stopBreakpoint: (() => void) | undefined = undefined;
 
   aboutToAppear(): void {
     this.immersiveSupported = uiMaterial.isImmersiveMaterialSupported();
+    // 先加载持久化主题；应用色板后递增版本强制重建 shell。
+    SettingsRepository.getString(SettingsKeys.THEME_MODE, 'purple').then((mode: string) => {
+      ThemeTokens.applyMode(mode);
+      this.themeMode = mode;
+      AppStorage.setOrCreate('starflow_theme_mode', mode);
+      this.themeRev = (AppStorage.get<number>('starflow_theme_rev') ?? 0) + 1;
+      this.applySystemBars();
+    }).catch((e: Error) => {
+      console.warn('theme load failed: ' + e.message);
+    });
+    // 碰一碰分享/接收（设备不支持时内部降级）。
+    setTimeout(() => {
+      this.initShareBridge();
+    }, 900);
     // Initial value from real screen size; refined by the root onAreaChange.
     this.sizeClass = sizeClassOfWidth(screenWidthVp());
     const ctx = getContext(this) as common.UIAbilityContext;
@@ -77,6 +96,49 @@ struct Index {
     setTimeout(() => {
       this.maybeShowOnboarding();
     }, 700);
+  }
+
+  private onThemeRev(): void {
+    ThemeTokens.applyMode(this.themeMode);
+    this.applySystemBars();
+  }
+
+  /** 系统栏跟随浅色/深色主题；失败仅记录，不影响页面。 */
+  private applySystemBars(): void {
+    try {
+      const ctx = getContext(this) as common.UIAbilityContext;
+      window.getLastWindow(ctx).then((win: window.Window) => {
+        win.setWindowBackgroundColor(ThemeTokens.SURFACE);
+        win.setWindowSystemBarProperties({
+          statusBarColor: ThemeTokens.SURFACE,
+          statusBarContentColor: ThemeTokens.isLight() ? '#0F2742' : '#FFFFFF',
+          navigationBarColor: ThemeTokens.SURFACE,
+          navigationBarContentColor: ThemeTokens.isLight() ? '#0F2742' : '#FFFFFF'
+        }).catch(() => {
+        });
+      }).catch(() => {
+      });
+    } catch (e) {
+      // 窗口可能尚未创建；忽略。
+    }
+  }
+
+  /** 注册碰一碰发送 + 碰一碰/隔空投送文件接收；收到文件交给 ImportService。 */
+  private async initShareBridge(): Promise<void> {
+    try {
+      const ctx = getContext(this) as common.UIAbilityContext;
+      ShareService.registerKnockSender();
+      const win = await window.getLastWindow(ctx);
+      const windowId = win.getWindowProperties().id;
+      await ShareService.registerKnockReceiver(ctx, windowId, (uris: Array<string>) => {
+        ShareService.importReceived(uris).then((count: number) => {
+          promptAction.showToast({ message: count > 0 ? '碰一碰导入完成：' + count + ' 部' : '收到文件但没有可导入内容' });
+        }).catch(() => {
+        });
+      });
+    } catch (e) {
+      console.warn('share bridge init failed: ' + JSON.stringify(e));
+    }
   }
 
   private async maybeShowOnboarding(): Promise<void> {
@@ -103,19 +165,28 @@ struct Index {
 
   @Builder
   phoneTab(index: number, icon: Resource, label: Resource) {
-    Column() {
+    Column({ space: 1 }) {
       Image(icon)
         .width(22)
         .height(22)
         .fillColor(this.currentTab === index ? ThemeTokens.PRIMARY : ThemeTokens.TEXT_HINT)
+        .shadow(this.currentTab === index
+          ? { radius: 8, color: ThemeTokens.PRIMARY, offsetX: 0, offsetY: 0 }
+          : { radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 })
       Text(label)
         .fontSize(10)
+        .fontWeight(this.currentTab === index ? FontWeight.Medium : FontWeight.Normal)
         .fontColor(this.currentTab === index ? ThemeTokens.PRIMARY : ThemeTokens.TEXT_HINT)
-        .margin({ top: 3 })
     }
     .justifyContent(FlexAlign.Center)
-    .width('100%')
-    .height('100%')
+    .width(58)
+    .height(48)
+    .borderRadius(ThemeTokens.RADIUS_PILL)
+    // 沉浸光感：选中项使用低透明度主色胶囊，悬浮在毛玻璃材质上。
+    .backgroundColor(this.currentTab === index
+      ? (ThemeTokens.isLight() ? '#1A1F6FEB' : '#26A78BFA')
+      : Color.Transparent)
+    .animation({ duration: ThemeTokens.DURATION_FAST, curve: Curve.EaseOut })
   }
 
   @Builder
@@ -226,12 +297,17 @@ struct Index {
   @Builder
   phoneTabContent(index: number) {
     Column() {
-      this.tabContent(index)
+      // 性能：Tabs 默认会一次性构建全部 5 个页签；只构建当前页，切页再懒加载。
+      if (this.currentTab === index) {
+        this.tabContent(index)
+      }
     }
     .width('100%')
     .height('100%')
     .padding({ bottom: 84 })
     .backgroundColor(ThemeTokens.SURFACE)
+    // 主题切换时强制重建每个 Tab 内容，避免 Tabs 缓存旧色板。
+    .key('tab-' + index + '-' + this.themeRev)
   }
 
   @Builder
@@ -395,11 +471,16 @@ struct Index {
 
   build() {
     Navigation(this.navStack) {
-      if (this.isWide()) {
-        this.wideShell()
-      } else {
-        this.phoneShell()
+      Column() {
+        if (this.isWide()) {
+          this.wideShell()
+        } else {
+          this.phoneShell()
+        }
       }
+      .width('100%')
+      .height('100%')
+      .key('shell-' + this.themeRev)
     }
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)

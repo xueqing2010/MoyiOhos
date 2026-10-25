@@ -1,3 +1,5 @@
+import { common } from '@kit.AbilityKit';
+import { unifiedDataChannel, uniformTypeDescriptor } from '@kit.ArkData';
 import { Manga } from 'coremodel';
 import { ThemeTokens, WindowSizeClass, observeBreakpoint, toMediaUri } from 'commons';
 import { Artwork } from '../components/Artwork';
@@ -9,6 +11,8 @@ import { MangaCoverCard } from '../components/MangaCoverCard';
 import { NovelShelfView } from '../novel/NovelShelfView';
 import { DemoDataResult, DemoDataService } from '../service/DemoDataService';
 import { ExportMode, ExportResult } from '../service/ExportService';
+import { ImportService } from '../service/ImportService';
+import { ShareService } from '../service/ShareService';
 import {
   gridColumnsTemplate,
   makeMangaDisplay,
@@ -45,6 +49,8 @@ export struct ShelfView {
   @State areaWidth: number = 360;
   @State refreshingDirs: boolean = false;
   @State demoBusy: boolean = false;
+  /** 拖入导入：文件管理器拖拽悬停时显示投放遮罩。 */
+  @State dragActive: boolean = false;
 
   // 弹层状态（全部用页面内遮罩实现，统一紫夜配色）
   @State showTools: boolean = false;
@@ -288,6 +294,71 @@ export struct ShelfView {
     this.showTools = false;
     this.showSort = false;
     this.showMenu = true;
+    // 碰一碰分享的目标漫画：轻碰另一台设备时由 ShareService 取用。
+    ShareService.setKnockManga(d.id);
+  }
+
+  private async shareManga(id: number): Promise<void> {
+    this.showMenu = false;
+    try {
+      const ctx = getContext(this) as common.UIAbilityContext;
+      const count = await ShareService.shareManga(ctx, id);
+      this.showHint('已调起华为分享（' + count + ' 页）');
+    } catch (e) {
+      this.showHint('分享失败：' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  /** 从拖动数据里提取文件 URI（File/Image 记录都带 uri）。 */
+  private collectDroppedUris(event: DragEvent): Array<string> {
+    const uris: Array<string> = [];
+    try {
+      const data = event.getData();
+      const records = data.getRecords();
+      for (const record of records) {
+        try {
+          const file = record as Object as unifiedDataChannel.File;
+          if (file.uri !== undefined && file.uri.length > 0) {
+            uris.push(file.uri);
+          }
+        } catch (e) {
+          // 非文件记录（文本/HTML 等）忽略。
+        }
+      }
+    } catch (e) {
+      // 拖拽数据不可读时按不支持处理。
+    }
+    return uris;
+  }
+
+  private async handleDrop(event: DragEvent): Promise<void> {
+    this.dragActive = false;
+    const uris = this.collectDroppedUris(event);
+    if (uris.length === 0) {
+      this.showHint('拖入的内容不是图片或压缩包');
+      try {
+        event.setResult(DragResult.DRAG_SUCCESSFUL);
+      } catch (e) {
+      }
+      return;
+    }
+    try {
+      event.setResult(DragResult.DRAG_SUCCESSFUL);
+    } catch (e) {
+    }
+    this.showHint('正在导入 ' + uris.length + ' 个文件…');
+    try {
+      const result = await ImportService.importDropped(uris, (p) => {
+        if (p.total > 0) {
+          this.hint = p.phase + ' ' + p.done + '/' + p.total;
+        }
+      });
+      AppStorage.setOrCreate('starflow_shelf_dirty', Date.now());
+      await this.refresh();
+      this.showHint(result.length > 0 ? '拖入导入完成：' + result.length + ' 部漫画' : '没有可导入的漫画');
+    } catch (e) {
+      this.showHint('拖入导入失败：' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   private openRename(): void {
@@ -955,6 +1026,9 @@ export struct ShelfView {
         this.sheetRow(Artwork.ICON_READER_BATCH, '批量翻译', false, () => {
           this.batchTranslate(this.menuId);
         })
+        this.sheetRow(Artwork.ICON_SHARE, '华为分享', false, () => {
+          this.shareManga(this.menuId);
+        })
         this.sheetRow(Artwork.ICON_CHECK, '多选', false, () => {
           this.enterSelectMode(this.menuId);
         })
@@ -1314,6 +1388,17 @@ export struct ShelfView {
           this.refresh();
         }
       })
+      // 拖入导入：文件管理器/桌面把图片或压缩包拖到书架上。
+      .allowDrop([uniformTypeDescriptor.UniformDataType.FILE, uniformTypeDescriptor.UniformDataType.IMAGE])
+      .onDragEnter((event: DragEvent) => {
+        this.dragActive = true;
+      })
+      .onDragLeave(() => {
+        this.dragActive = false;
+      })
+      .onDrop((event: DragEvent) => {
+        this.handleDrop(event);
+      })
 
       if (this.hint.length > 0) {
         Text(this.hint)
@@ -1345,6 +1430,29 @@ export struct ShelfView {
         .borderRadius(ThemeTokens.RADIUS_CARD)
         .backgroundColor('#E60B0813')
         .margin({ bottom: 96 })
+      }
+
+      if (this.dragActive) {
+        Column({ space: 10 }) {
+          Image(Artwork.ICON_UPLOAD)
+            .width(42)
+            .height(42)
+            .fillColor(ThemeTokens.PRIMARY)
+          Text('松开导入漫画')
+            .fontSize(ThemeTokens.FONT_SUBTITLE)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(ThemeTokens.TEXT_PRIMARY)
+          Text('支持图片、ZIP / CBZ 压缩包与图片文件夹')
+            .fontSize(ThemeTokens.FONT_SMALL)
+            .fontColor(ThemeTokens.TEXT_HINT)
+        }
+        .justifyContent(FlexAlign.Center)
+        .width('90%')
+        .height(220)
+        .borderRadius(ThemeTokens.RADIUS_CARD)
+        .border({ width: 2, color: ThemeTokens.PRIMARY, style: BorderStyle.Dashed })
+        .backgroundColor(ThemeTokens.SURFACE_SECONDARY)
+        .hitTestBehavior(HitTestMode.None)
       }
 
       if (this.showTools) {

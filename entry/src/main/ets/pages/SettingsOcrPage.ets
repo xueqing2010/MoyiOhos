@@ -88,9 +88,9 @@ export struct SettingsOcrPage {
     new OcrLangOption('zh-CN', '简体中文', '中文内容与译后校对'),
     new OcrLangOption('ko', '한국어', '韩文条漫')
   ];
-  private tiers: Array<OcrTier> = [
-    new OcrTier('system', '系统 Core Vision Kit', 'HarmonyOS 官方文字识别（textRecognition），本机离线推理，当前版本唯一可用档位。', true),
-    new OcrTier('local', '本地自建模型', '上游 manga-ocr / PP-OCR 等模型的鸿蒙移植，当前版本未接入。', false),
+  @State tiers: Array<OcrTier> = [
+    new OcrTier('system', '系统 Core Vision Kit', 'HarmonyOS 官方文字识别（textRecognition），本机离线推理。', true),
+    new OcrTier('local', '本地 PP-OCRv6（ONNX）', 'ONNX Runtime NAPI 在当前模拟器上构造张量崩溃，待真机/新版运行时验证后启用。', false),
     new OcrTier('cloud', '云端 OCR 服务', '需要第三方账号与网络上传，与本地优先的隐私策略冲突，未接入。', false)
   ];
 
@@ -118,6 +118,14 @@ export struct SettingsOcrPage {
   private refreshModels(): void {
     this.detReady = OcrModelService.isDownloaded(this.models[0]);
     this.recReady = OcrModelService.isDownloaded(this.models[1]);
+    const ready = this.detReady && this.recReady;
+    this.tiers = [
+      new OcrTier('system', '系统 Core Vision Kit', 'HarmonyOS 官方文字识别（textRecognition），本机离线推理。', true),
+      new OcrTier('local', '本地 PP-OCRv6（ONNX）',
+        ready ? '模型已下载，但 ONNX Runtime NAPI 在当前模拟器崩溃，暂不可启用。'
+          : '请先下载检测与识别模型；推理运行时兼容性验证中。', false),
+      new OcrTier('cloud', '云端 OCR 服务', '需要第三方账号与网络上传，与本地优先的隐私策略冲突，未接入。', false)
+    ];
   }
 
   private isReady(info: OcrModelInfo): boolean {
@@ -200,12 +208,12 @@ export struct SettingsOcrPage {
 
   private async pickTier(tier: OcrTier): Promise<void> {
     if (!tier.available) {
-      this.flash('该档位当前版本未接入');
+      this.flash(tier.id === 'local' ? '本地推理运行时兼容性验证中，暂不可用' : '该档位当前版本未接入');
       return;
     }
     this.ocrTier = tier.id;
     await SettingsRepository.set(SettingsKeys.OCR_ENGINE_TIER, tier.id);
-    this.flash('OCR 引擎档位已保存');
+    this.flash(tier.id === 'local' ? '已启用本地 OCR（翻译时生效）' : 'OCR 引擎档位已保存');
   }
 
   private flash(text: string): void {
@@ -371,12 +379,12 @@ export struct SettingsOcrPage {
                 .lineHeight(17)
             }
 
-            this.sectionTitle('引擎档位', '当前版本仅提供系统 Core Vision Kit 文字识别')
+            this.sectionTitle('引擎档位', '系统 Core Vision 或本地 PP-OCRv6（需下载模型）')
             OcrSettingCard() {
               ForEach(this.tiers, (tier: OcrTier) => {
                 this.tierRow({ tier: tier, active: this.ocrTier === tier.id })
               }, (tier: OcrTier) => tier.id)
-              Text('档位偏好会保存；系统档位是当前唯一可用实现，本地/云端档位为后续预留。')
+              Text('档位偏好会保存；本地档位在 ONNX Runtime 兼容性验证通过后启用，云端档位未接入。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)
                 .width('100%')
@@ -388,7 +396,7 @@ export struct SettingsOcrPage {
               ForEach(this.models, (info: OcrModelInfo) => {
                 this.modelRow(info)
               }, (info: OcrModelInfo) => info.key)
-              Text('模型来自上游 StarFlow（LGPL-3.0）的 ppocrv6 assets；下载后保存在应用 models 目录。当前 OCR 仍由系统 Core Vision Kit 提供，本地 ONNX 推理接入后可切换到这些模型。')
+              Text('模型来自上游 StarFlow（LGPL-3.0）的 ppocrv6 assets；本地推理依赖 ONNX Runtime 鸿蒙 NAPI，当前模拟器上张量构造会触发原生崩溃，已停用，待真机/新版运行时验证后启用。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)
                 .width('100%')

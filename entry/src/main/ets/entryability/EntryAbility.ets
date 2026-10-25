@@ -9,15 +9,27 @@
 
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
+import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { AppEnv } from '../common/AppEnv';
 import { Log, ThemeTokens } from 'commons';
 
-/** Purple Nocturne app shell: fixed dark color mode keeps system materials dark. */
+/** App shell: persisted palette (紫夜/蓝白) is applied before loadContent. */
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    let mode = 'purple';
     try {
-      this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
+      const store = preferences.getPreferencesSync(this.context, { name: 'starflow_settings' });
+      const saved = store.getSync('theme_mode', 'purple');
+      mode = saved as string;
+    } catch (e) {
+      Log.warn('EntryAbility', 'theme preference read failed: ' + JSON.stringify(e));
+    }
+    ThemeTokens.applyMode(mode);
+    try {
+      this.context.getApplicationContext().setColorMode(mode === 'blue'
+        ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT
+        : ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
     } catch (err) {
       Log.error('EntryAbility', `Failed to set colorMode. Cause: ${JSON.stringify(err)}`);
     }
@@ -56,9 +68,9 @@ export default class EntryAbility extends UIAbility {
       mainWindow.setWindowBackgroundColor(ThemeTokens.SURFACE);
       mainWindow.setWindowSystemBarProperties({
         statusBarColor: ThemeTokens.SURFACE,
-        statusBarContentColor: '#FFFFFF',
+        statusBarContentColor: ThemeTokens.isLight() ? '#0F2742' : '#FFFFFF',
         navigationBarColor: ThemeTokens.SURFACE,
-        navigationBarContentColor: '#FFFFFF'
+        navigationBarContentColor: ThemeTokens.isLight() ? '#0F2742' : '#FFFFFF'
       }).catch((e: BusinessError) => {
         Log.warn('EntryAbility', `setWindowSystemBarProperties failed: ${e.message}`);
       });

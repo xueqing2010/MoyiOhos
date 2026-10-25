@@ -4,6 +4,7 @@ import {
   OverlayColors,
   OverlayRegion,
   OverlayRenderer,
+  OverlayItem,
   PageOverlay,
   RenderOptions,
   RenderOrientation,
@@ -118,6 +119,9 @@ struct ReaderPageLayer {
   private pageSize: PageSize = new PageSize();
   private translation: PageTranslation | undefined = undefined;
   private canvasReady: boolean = false;
+  // 覆盖层排版计划缓存：翻页/缩放/亮度变化时避免重复做逐字排版（性能优化）。
+  private planKey: string = '';
+  private planItems: Array<OverlayItem> = [];
   private transLoaded: boolean = false;
 
   aboutToAppear(): void {
@@ -252,7 +256,16 @@ struct ReaderPageLayer {
       const item: OverlayRegion = { box: box, original: region.text, translated: text };
       regions.push(item);
     }
-    const items = PageOverlay.build(regions, opts, useTranslated, this.whiteMerge);
+    // 仅当页/译文/排版参数变化时重新 build；尺寸变化只需重新 paint。
+    const key = this.page.id + '|' + this.mode + '|' + this.renderRev + '|' + this.translationRev
+      + '|' + this.whiteMerge + '|' + this.fontMode + '|' + this.fixedSize + '|' + this.orientation
+      + '|' + this.vdir + '|' + this.lineHeight + '|' + this.pageSize.width + 'x' + this.pageSize.height
+      + '|' + useTranslated;
+    if (key !== this.planKey) {
+      this.planItems = PageOverlay.build(regions, opts, useTranslated, this.whiteMerge);
+      this.planKey = key;
+    }
+    const items = this.planItems;
     const colors = this.filterInvert
       ? OverlayColors.make('#15121F', '#E8E4F5')
       : OverlayColors.make('#FFFFFF', '#1A1A1A');

@@ -32,8 +32,16 @@ export class SettingsKeys {
   static readonly ONBOARDING_DONE: string = 'onboarding_done';
   /** 主题模式（string）：'purple' 紫夜深色（默认）| 'oled' 紫夜纯黑 OLED | 'system' 跟随系统。当前版本仅记录偏好，运行时固定紫夜深色。 */
   static readonly THEME_MODE: string = 'theme_mode';
-  /** OCR 引擎档位（string）：'system' 系统 Core Vision Kit（默认，唯一可用）| 'local' 预留本地模型档。 */
+  /** OCR 引擎档位（string）：'system' 系统 Core Vision Kit（默认）| 'local' 本地 ONNX 模型（需下载模型）。 */
   static readonly OCR_ENGINE_TIER: string = 'ocr_engine_tier';
+  /** 华为账号是否已登录（bool，仅本地会话标记；凭证不落盘）。 */
+  static readonly HW_ACCOUNT_LOGGED_IN: string = 'hw_account_logged_in';
+  /** 华为账号 OpenID（string，用于展示脱敏 ID 与云同步归属校验）。 */
+  static readonly HW_ACCOUNT_OPEN_ID: string = 'hw_account_open_id';
+  /** 华为账号 UnionID（string）。 */
+  static readonly HW_ACCOUNT_UNION_ID: string = 'hw_account_union_id';
+  /** 最近一次华为云备份时间（number，毫秒）。 */
+  static readonly CLOUD_SYNC_LAST: string = 'cloud_sync_last';
   /** 最近选择的翻译厂商（string）：'bing'|'openai'|'deepseek'|'qwen'|'doubao'|'zhipu'|'custom'。 */
   static readonly API_PROVIDER: string = 'api_provider';
   /** OpenAI 兼容 API Key 的 AssetKeyStore alias（string，不是 preferences 键；与 translate-dev 共用）。 */
