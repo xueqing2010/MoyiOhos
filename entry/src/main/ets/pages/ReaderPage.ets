@@ -30,6 +30,7 @@ import { ReaderMenuView } from '../views/ReaderMenuView';
 import { ReaderSettingsSheet, cloneReaderSettings } from '../views/ReaderSettingsSheet';
 import { BatchPanel } from '../views/BatchPanel';
 import { PageTranslateService } from '../service/PageTranslateService';
+import { Motion } from '../common/Motion';
 import { OcrModelService } from '../service/OcrModelService';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { BatchState } from '../service/BatchTranslateService';
@@ -1477,6 +1478,7 @@ export struct ReaderPage {
     .width('100%')
     .height('100%')
     .backgroundColor('#66000000')
+    .transition(Motion.overlay())
   }
 
   @Builder
@@ -1505,6 +1507,7 @@ export struct ReaderPage {
     .width('100%')
     .height('100%')
     .backgroundColor('#66000000')
+    .transition(Motion.overlay())
   }
 
   @Builder

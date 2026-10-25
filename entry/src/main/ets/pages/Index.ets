@@ -12,6 +12,7 @@ import { AppEnv } from '../common/AppEnv';
 import { Routes } from '../common/Routes';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { ShareService } from '../service/ShareService';
+import { Motion } from '../common/Motion';
 import { promptAction } from '@kit.ArkUI';
 import { ShelfView } from '../views/ShelfView';
 import { ImportView } from '../views/ImportView';
@@ -178,6 +179,7 @@ struct Index {
     .justifyContent(FlexAlign.Center)
     .width('100%')
     .height('100%')
+    .animation({ duration: Motion.FAST, curve: Curve.EaseOut })
   }
 
   @Builder
@@ -288,10 +290,9 @@ struct Index {
   @Builder
   phoneTabContent(index: number) {
     Column() {
-      // 性能：Tabs 默认会一次性构建全部 5 个页签；只构建当前页，切页再懒加载。
-      if (this.currentTab === index) {
-        this.tabContent(index)
-      }
+      // 保持所有 TabContent 已构建，Tabs 切换动画才能展示目标页内容；
+      // 启动成本由各页自身的懒加载/分页承担。
+      this.tabContent(index)
     }
     .width('100%')
     .height('100%')
@@ -338,6 +339,8 @@ struct Index {
     .barMode(BarMode.Fixed)
     .scrollable(true)
     .barHeight(56)
+    .animationDuration(320)
+    .animationMode(AnimationMode.CONTENT_FIRST)
     .barOverlap(true)
     .barPosition(BarPosition.End)
     .barFloatingStyle({
@@ -480,6 +483,7 @@ struct Index {
       .width('100%')
       .height('100%')
       .key('shell-' + this.themeRev)
+      .transition(Motion.fade())
     }
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)

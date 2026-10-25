@@ -12,6 +12,7 @@ import { NovelShelfView } from '../novel/NovelShelfView';
 import { DemoDataResult, DemoDataService } from '../service/DemoDataService';
 import { ExportMode, ExportResult } from '../service/ExportService';
 import { ImportService } from '../service/ImportService';
+import { Motion } from '../common/Motion';
 import { ShareService } from '../service/ShareService';
 import {
   gridColumnsTemplate,
@@ -949,6 +950,7 @@ export struct ShelfView {
     .width('100%')
     .height('100%')
     .backgroundColor('#99000000')
+    .transition(Motion.overlay())
     .justifyContent(FlexAlign.End)
   }
 
@@ -1005,6 +1007,7 @@ export struct ShelfView {
     .width('100%')
     .height('100%')
     .backgroundColor('#99000000')
+    .transition(Motion.overlay())
     .justifyContent(FlexAlign.End)
   }
 
@@ -1061,6 +1064,7 @@ export struct ShelfView {
     .width('100%')
     .height('100%')
     .backgroundColor('#99000000')
+    .transition(Motion.overlay())
     .justifyContent(FlexAlign.End)
   }
 
@@ -1116,6 +1120,7 @@ export struct ShelfView {
     .width('100%')
     .height('100%')
     .backgroundColor('#99000000')
+    .transition(Motion.overlay())
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
   }
@@ -1217,6 +1222,7 @@ export struct ShelfView {
     .width('100%')
     .height('100%')
     .backgroundColor('#99000000')
+    .transition(Motion.overlay())
     .justifyContent(FlexAlign.End)
   }
 
@@ -1275,6 +1281,7 @@ export struct ShelfView {
     .width('100%')
     .height('100%')
     .backgroundColor('#99000000')
+    .transition(Motion.overlay())
     .justifyContent(FlexAlign.End)
   }
 
@@ -1322,6 +1329,7 @@ export struct ShelfView {
     .width('100%')
     .height('100%')
     .backgroundColor('#99000000')
+    .transition(Motion.overlay())
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
   }

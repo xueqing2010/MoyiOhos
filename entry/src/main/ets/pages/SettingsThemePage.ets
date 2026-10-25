@@ -89,7 +89,10 @@ export struct SettingsThemePage {
     await SettingsRepository.set(SettingsKeys.THEME_MODE, id);
     AppStorage.setOrCreate('starflow_theme_mode', id);
     const rev: number = AppStorage.get<number>('starflow_theme_rev') ?? 0;
-    AppStorage.setOrCreate('starflow_theme_rev', rev + 1);
+    // 主题切换走过渡动画，避免整页色板瞬间跳变。
+    animateTo({ duration: 260, curve: Curve.EaseOut }, () => {
+      AppStorage.setOrCreate('starflow_theme_rev', rev + 1);
+    });
     try {
       const ctx = getContext(this) as common.UIAbilityContext;
       await ctx.getApplicationContext().setColorMode(id === 'blue'
