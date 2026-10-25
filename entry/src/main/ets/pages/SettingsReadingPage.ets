@@ -77,7 +77,7 @@ export struct SettingsReadingPage {
   @State bg: string = 'nocturne';
   @State mode: string = 'raw';
   @State pageAnim: string = 'slide';
-  @State orientation: number = 1;
+  @State orientation: number = 2;
   @State vDirection: number = 0;
   @State fontSizeMode: number = 0;
   @State fontSize: number = 16;
@@ -519,6 +519,9 @@ export struct SettingsReadingPage {
                 .width('100%')
                 .margin({ top: 6 })
               Flex({ wrap: FlexWrap.Wrap }) {
+                this.optionChip({ label: '自动', active: this.orientation === 2, onTap: () => {
+                  this.pickOrientation(2);
+                } })
                 this.optionChip({ label: '竖排', active: this.orientation === 1, onTap: () => {
                   this.pickOrientation(1);
                 } })

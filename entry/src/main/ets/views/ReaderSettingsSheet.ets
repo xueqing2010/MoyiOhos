@@ -170,6 +170,11 @@ export struct ReaderSettingsSheet {
   sectionLayout() {
     this.titleRow('排版')
     Row({ space: 8 }) {
+      this.chip('自动', this.settings.orientation === 2, () => {
+        this.update((s: ReaderSettings) => {
+          s.orientation = 2;
+        });
+      })
       this.chip('横排', this.settings.orientation === 0, () => {
         this.update((s: ReaderSettings) => {
           s.orientation = 0;

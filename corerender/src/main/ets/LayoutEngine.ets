@@ -3,7 +3,9 @@ import { DisplayRect } from './Geometry';
 /** Text orientation inside bubbles. */
 export enum RenderOrientation {
   HORIZONTAL = 0,
-  VERTICAL = 1
+  VERTICAL = 1,
+  /** 按检测框宽高自动选择横排/竖排（覆盖层逐框推断）。 */
+  AUTO = 2
 }
 
 /** Column flow direction for vertical text (manga default: RTL). */

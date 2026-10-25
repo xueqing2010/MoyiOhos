@@ -189,7 +189,7 @@ export class ReaderBg {
 
 /** 持久化渲染设置（行距/边距/白块合并也在这里，实时生效）。 */
 export class RenderSettingsModel {
-  orientation: number = 1; // RenderOrientation.VERTICAL
+  orientation: number = 2; // RenderOrientation.AUTO（按检测框宽高逐块判断）
   verticalDirection: number = 0; // VerticalDirection.RTL
   fontSizeMode: number = 0; // FontSizeMode.AUTO
   fixedFontSize: number = 16;
@@ -211,7 +211,7 @@ export class ReaderSettings {
   mode: string = ReaderMode.RAW;
   flow: string = ReaderFlow.RTL;
   animation: string = ReaderAnimation.SLIDE;
-  orientation: number = 1;
+  orientation: number = 2;
   verticalDirection: number = 0;
   fontSizeMode: number = 0;
   fixedFontSize: number = 16;
@@ -239,7 +239,8 @@ export class ReaderSettings {
   /** 引擎渲染选项：排版在页面坐标系完成，padding 由页面边距设置换算。 */
   toRenderOptions(): RenderOptions {
     const opts: RenderOptions = {
-      orientation: this.orientation === 0 ? RenderOrientation.HORIZONTAL : RenderOrientation.VERTICAL,
+      orientation: this.orientation === 0 ? RenderOrientation.HORIZONTAL
+        : (this.orientation === 2 ? RenderOrientation.AUTO : RenderOrientation.VERTICAL),
       verticalDirection: this.verticalDirection === 0 ? VerticalDirection.RTL : VerticalDirection.LTR,
       fontSizeMode: this.fontSizeMode === 0 ? FontSizeMode.AUTO : FontSizeMode.FIXED,
       fixedFontSize: this.fixedFontSize,
@@ -312,7 +313,7 @@ export class ReaderViewModel {
       s.mode = ReaderMode.normalize(pref.getSync(ReaderPrefKeys.MODE, ReaderMode.RAW) as string);
       s.flow = ReaderFlow.normalize(pref.getSync(ReaderPrefKeys.FLOW, ReaderFlow.RTL) as string);
       s.animation = ReaderAnimation.normalize(pref.getSync(ReaderPrefKeys.ANIM, ReaderAnimation.SLIDE) as string);
-      s.orientation = ReaderViewModel.clampInt(pref.getSync(ReaderPrefKeys.ORIENT, 1) as number, 0, 1);
+      s.orientation = ReaderViewModel.clampInt(pref.getSync(ReaderPrefKeys.ORIENT, 2) as number, 0, 2);
       s.verticalDirection = ReaderViewModel.clampInt(pref.getSync(ReaderPrefKeys.DIRECTION, 0) as number, 0, 1);
       s.fontSizeMode = ReaderViewModel.clampInt(pref.getSync(ReaderPrefKeys.FONT_MODE, 0) as number, 0, 1);
       s.fixedFontSize = ReaderViewModel.clampInt(pref.getSync(ReaderPrefKeys.FONT_SIZE, 16) as number, 12, 40);

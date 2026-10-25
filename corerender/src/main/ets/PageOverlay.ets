@@ -102,6 +102,44 @@ function joinText(prev: string, next: string): string {
   return prev + next;
 }
 
+/** 单个框的横/竖排推断：竖长框→竖排，横宽框→横排；近似方形时参考文本长度。 */
+function inferOrientation(box: DisplayRect, text: string): RenderOrientation {
+  if (box.w <= 0 || box.h <= 0) {
+    return RenderOrientation.HORIZONTAL;
+  }
+  const ratio = box.h / box.w;
+  if (ratio >= 1.35) {
+    return RenderOrientation.VERTICAL;
+  }
+  if (box.w / box.h >= 1.35) {
+    return RenderOrientation.HORIZONTAL;
+  }
+  // 近方形：多字且不宽于高，按日漫常见的竖排处理。
+  if (text.length >= 3 && box.h >= box.w) {
+    return RenderOrientation.VERTICAL;
+  }
+  return RenderOrientation.HORIZONTAL;
+}
+
+/** 把 AUTO 解析成 concrete options；非 AUTO 直接复用。 */
+function resolveOptions(opts: RenderOptions, box: DisplayRect, text: string): RenderOptions {
+  if (opts.orientation !== RenderOrientation.AUTO) {
+    return opts;
+  }
+  const out: RenderOptions = {
+    orientation: inferOrientation(box, text),
+    verticalDirection: opts.verticalDirection,
+    fontSizeMode: opts.fontSizeMode,
+    fixedFontSize: opts.fixedFontSize,
+    padding: opts.padding,
+    lineSpacing: opts.lineSpacing,
+    charSpacing: opts.charSpacing,
+    pageWidth: opts.pageWidth,
+    pageHeight: opts.pageHeight
+  };
+  return out;
+}
+
 /** 排序键：横排按 行(y)→列(x)；竖排按 列(x)→行(y)（RTL 列从右到左）。 */
 function sortMembers(members: Array<number>, boxes: Array<DisplayRect>, opts: RenderOptions): void {
   const vertical = opts.orientation === RenderOrientation.VERTICAL;
@@ -177,7 +215,7 @@ export class PageOverlay {
     }
     if (!mergeWhite || count === 1) {
       for (let i = 0; i < count; i++) {
-        const layout = LayoutEngine.layout(texts[i], boxes[i], opts);
+        const layout = LayoutEngine.layout(texts[i], boxes[i], resolveOptions(opts, boxes[i], texts[i]));
         items.push(makeOverlayItem(boxes[i], texts[i], layout, 1));
       }
       return items;
@@ -223,7 +261,6 @@ export class PageOverlay {
     }
     for (let g = 0; g < groups.length; g++) {
       const members = groups[g];
-      sortMembers(members, boxes, opts);
       let box: DisplayRect = boxes[members[0]];
       let text = '';
       for (let k = 0; k < members.length; k++) {
@@ -231,7 +268,10 @@ export class PageOverlay {
         box = unionRect(box, boxes[idx]);
         text = joinText(text, texts[idx]);
       }
-      const layout = LayoutEngine.layout(text, box, opts);
+      // 合并后按整块宽高重新推断方向，再按该方向排序成员。
+      const groupOpts = resolveOptions(opts, box, text);
+      sortMembers(members, boxes, groupOpts);
+      const layout = LayoutEngine.layout(text, box, groupOpts);
       items.push(makeOverlayItem(box, text, layout, members.length));
     }
     return items;

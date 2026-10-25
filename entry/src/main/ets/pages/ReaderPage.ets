@@ -186,7 +186,8 @@ struct ReaderPageLayer {
 
   private buildOptions(): RenderOptions {
     const opts: RenderOptions = {
-      orientation: this.orientation === 0 ? RenderOrientation.HORIZONTAL : RenderOrientation.VERTICAL,
+      orientation: this.orientation === 0 ? RenderOrientation.HORIZONTAL
+        : (this.orientation === 2 ? RenderOrientation.AUTO : RenderOrientation.VERTICAL),
       verticalDirection: this.vdir === 0 ? VerticalDirection.RTL : VerticalDirection.LTR,
       fontSizeMode: this.fontMode === 0 ? FontSizeMode.AUTO : FontSizeMode.FIXED,
       fixedFontSize: this.fixedSize,
