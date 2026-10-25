@@ -59,7 +59,7 @@ export class CloudSyncService {
     const mangas = await MangaDao.queryAll();
     const novels = await NovelDao.queryAll();
     const settings: BackupSettings = {
-      theme: await SettingsRepository.getString(SettingsKeys.THEME_MODE, 'purple'),
+      theme: await SettingsRepository.getString(SettingsKeys.THEME_MODE, 'blue'),
       targetLang: await SettingsRepository.getString(SettingsKeys.TARGET_LANG, 'zh'),
       ocrLang: await SettingsRepository.getString(SettingsKeys.OCR_LANG, 'ja'),
       engine: await SettingsRepository.getNumber(SettingsKeys.ENGINE_TYPE, 0)

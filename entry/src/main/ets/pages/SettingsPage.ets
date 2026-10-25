@@ -39,7 +39,7 @@ export struct SettingsPage {
   @State fontLabel: string = '自动';
   @State engineLabel: string = '必应';
   @State targetLabel: string = '简体中文';
-  @State themeLabel: string = '紫夜深色';
+  @State themeLabel: string = '蓝白';
   @State ocrLabel: string = '日文';
   private navStack: NavPathStack = AppEnv.getInstance().navStack;
   private stopBreakpoint: (() => void) | undefined = undefined;
@@ -47,7 +47,7 @@ export struct SettingsPage {
   private readingEntries: Array<SettingsEntry> = [
     makeEntry('阅读设置', '背景、字号、行距、边距、翻页与竖排', $r('app.media.ic_reading'),
       Routes.SETTINGS_READING),
-    makeEntry('主题外观', '紫夜深色 / 紫夜纯黑 OLED / 跟随系统', $r('app.media.ic_theme'), Routes.SETTINGS_THEME)
+    makeEntry('主题外观', '蓝白配色 / 蓝黑夜间', $r('app.media.ic_theme'), Routes.SETTINGS_THEME)
   ];
   private translateEntries: Array<SettingsEntry> = [
     makeEntry('翻译设置', '引擎、目标语言、上下文轮次、提示词与温度', $r('app.media.ic_translate'),
@@ -95,7 +95,7 @@ export struct SettingsPage {
         // 保持 engineType 推断结果
       }
       this.targetLabel = SettingsPage.langName(translate.targetLang);
-      const theme: string = await SettingsRepository.getString(SettingsKeys.THEME_MODE, 'purple');
+      const theme: string = await SettingsRepository.getString(SettingsKeys.THEME_MODE, 'blue');
       this.themeLabel = SettingsPage.themeName(theme);
       const ocr: string = await SettingsRepository.getString(SettingsKeys.OCR_LANG, 'ja');
       this.ocrLabel = SettingsPage.ocrName(ocr);
@@ -153,13 +153,7 @@ export struct SettingsPage {
   }
 
   private static themeName(theme: string): string {
-    if (theme === 'oled') {
-      return '紫夜纯黑 OLED';
-    }
-    if (theme === 'system') {
-      return '跟随系统';
-    }
-    return '紫夜深色';
+    return theme === 'blueDark' ? '蓝黑夜间' : '蓝白';
   }
 
   private static ocrName(lang: string): string {

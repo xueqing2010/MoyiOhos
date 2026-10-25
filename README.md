@@ -11,7 +11,7 @@
 - **OCR 本地模型**：设置→OCR 可下载上游 PP-OCRv6 det/rec 模型（约 9 MB / 19 MB，不随安装包分发），下载后切换到本地档位，由 ONNX Runtime 鸿蒙 NAPI 在本机推理；也可继续使用系统 Core Vision Kit
 - **渲染健壮性**：译文白块按页面像素边界裁剪，并限制在页面图像画布内，避免越界/错位
 - **沉浸光感**：底部悬浮 Tabs + 27 个 NavDestination 标题栏 + Slider/Toggle 控件统一使用 API 26 `uiMaterial.ImmersiveMaterial`（ULTRA_THIN + interactive + lightEffect）；平板/2in1 使用左侧导航轨
-- **蓝白配色**：主题外观新增蓝白浅色档，运行时切换并重建 shell，紫夜/OLED/跟随系统保留
+- **蓝白配色**：蓝白为默认主题，另提供蓝黑夜间；已移除紫色主题，运行时切换并重建 shell
 - **导入与分享**：支持从文件管理器拖入图片/压缩包、碰一碰接收文件导入、漫画多页「华为分享」（Share Kit）
 - **华为账号与云同步**：Account Kit 登录按钮 + Cloud Foundation Kit 云存储备份书架索引/进度/偏好；需 AGC 开通云存储与正式签名
 - **文字方向自动**：覆盖层按每个 OCR 检测框的宽高逐块选择横排/竖排（横宽框→横排、竖长框→竖排），修复横向漫画译文被强制竖排导致的字距过大；设置中新增「自动」档

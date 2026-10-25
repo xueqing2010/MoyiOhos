@@ -14,14 +14,15 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { AppEnv } from '../common/AppEnv';
 import { Log, ThemeTokens } from 'commons';
 
-/** App shell: persisted palette (紫夜/蓝白) is applied before loadContent. */
+/** App shell: persisted palette (蓝白/蓝黑) is applied before loadContent; 旧紫色值迁移到蓝白。 */
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    let mode = 'purple';
+    let mode = 'blue';
     try {
       const store = preferences.getPreferencesSync(this.context, { name: 'starflow_settings' });
-      const saved = store.getSync('theme_mode', 'purple');
+      const saved = store.getSync('theme_mode', 'blue');
       mode = saved as string;
+      mode = mode === 'blueDark' ? 'blueDark' : 'blue';
     } catch (e) {
       Log.warn('EntryAbility', 'theme preference read failed: ' + JSON.stringify(e));
     }
@@ -59,7 +60,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   /**
-   * System bar + window chrome: deep purple background, light status-bar icons.
+   * System bar + window chrome: blue-white / blue-black background matching the theme.
    * Works for phone / tablet / 2in1 (window chrome is managed by the system on PC).
    */
   private configureWindow(windowStage: window.WindowStage): void {

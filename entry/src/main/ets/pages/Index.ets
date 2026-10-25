@@ -57,9 +57,9 @@ import { TextHistoryPage } from '../pages/TextHistoryPage';
 struct Index {
   @State currentTab: number = 0;
   @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
-  /** 主题版本：蓝白/紫夜切换后 +1，用 key 重建整个 shell 让所有页面重读色板。 */
+  /** 主题版本：蓝白/蓝黑切换后 +1，用 key 重建整个 shell 让所有页面重读色板。 */
   @StorageLink('starflow_theme_rev') @Watch('onThemeRev') themeRev: number = 0;
-  @StorageLink('starflow_theme_mode') themeMode: string = 'purple';
+  @StorageLink('starflow_theme_mode') themeMode: string = 'blue';
   private immersiveSupported: boolean = false;
   private navStack: NavPathStack = AppEnv.getInstance().navStack;
   private stopBreakpoint: (() => void) | undefined = undefined;
@@ -67,7 +67,8 @@ struct Index {
   aboutToAppear(): void {
     this.immersiveSupported = uiMaterial.isImmersiveMaterialSupported();
     // 先加载持久化主题；应用色板后递增版本强制重建 shell。
-    SettingsRepository.getString(SettingsKeys.THEME_MODE, 'purple').then((mode: string) => {
+    SettingsRepository.getString(SettingsKeys.THEME_MODE, 'blue').then((saved: string) => {
+      const mode = saved === 'blueDark' ? 'blueDark' : 'blue';
       ThemeTokens.applyMode(mode);
       this.themeMode = mode;
       AppStorage.setOrCreate('starflow_theme_mode', mode);
@@ -260,7 +261,7 @@ struct Index {
       this.railItem(4, $r('app.media.ic_tab_me'), $r('app.string.tab_me'))
 
       Blank()
-      Text('v1.1 · 紫夜')
+      Text('v1.1 · 蓝白')
         .fontSize(9)
         .fontColor(ThemeTokens.TEXT_TERTIARY)
         .margin({ bottom: 12 })

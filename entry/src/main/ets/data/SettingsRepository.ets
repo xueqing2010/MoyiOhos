@@ -30,7 +30,7 @@ export class SettingsKeys {
   // ---------- starflow_settings：应用级设置 ----------
   /** 首次启动引导是否已完成（bool）。Lead 启动时读取；引导页完成/跳过后写 true。 */
   static readonly ONBOARDING_DONE: string = 'onboarding_done';
-  /** 主题模式（string）：'purple' 紫夜深色（默认）| 'oled' 紫夜纯黑 OLED | 'system' 跟随系统。当前版本仅记录偏好，运行时固定紫夜深色。 */
+  /** 主题模式（string）：'blue' 蓝白（默认）| 'blueDark' 蓝黑夜间；旧 purple/oled/system 迁移到蓝白。 */
   static readonly THEME_MODE: string = 'theme_mode';
   /** OCR 引擎档位（string）：'system' 系统 Core Vision Kit（默认）| 'local' 本地 ONNX 模型（需下载模型）。 */
   static readonly OCR_ENGINE_TIER: string = 'ocr_engine_tier';

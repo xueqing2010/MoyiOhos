@@ -231,7 +231,7 @@ export struct MeView {
     groups.push(makeGroup('阅读与显示', $r('app.media.ic_reading'), [
       makeEntry('阅读设置', '背景六档、阅读模式、翻页动画、字号与行距', $r('app.media.ic_reading'),
         Routes.SETTINGS_READING),
-      makeEntry('主题外观', '紫夜深色 / 蓝白配色 / 紫夜纯黑 OLED / 跟随系统', $r('app.media.ic_theme'),
+      makeEntry('主题外观', '蓝白配色 / 蓝黑夜间', $r('app.media.ic_theme'),
         Routes.SETTINGS_THEME)
     ]));
     groups.push(makeGroup('翻译与引擎', $r('app.media.ic_translate'), [
@@ -294,7 +294,7 @@ export struct MeView {
             .fontSize(ThemeTokens.FONT_DISPLAY)
             .fontWeight(FontWeight.Bold)
             .fontColor(ThemeTokens.TEXT_PRIMARY)
-          Text(ThemeTokens.isLight() ? '蓝白' : '紫夜阅读')
+          Text(ThemeTokens.isLight() ? '蓝白' : '蓝黑夜间')
             .fontSize(ThemeTokens.FONT_SMALL)
             .fontColor(ThemeTokens.PRIMARY)
             .padding({ left: 8, right: 8, top: 2, bottom: 2 })

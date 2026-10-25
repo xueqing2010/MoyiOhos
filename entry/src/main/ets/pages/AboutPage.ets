@@ -126,7 +126,7 @@ export struct AboutPage {
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
           .borderRadius(ThemeTokens.RADIUS_PILL)
           .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-        Text('HarmonyOS · 紫夜阅读')
+        Text('HarmonyOS · 蓝白阅读')
           .fontSize(ThemeTokens.FONT_SMALL)
           .fontColor(ThemeTokens.TEXT_HINT)
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
@@ -243,7 +243,7 @@ export struct AboutPage {
                 this.navStack.pushPathByName(Routes.ONBOARDING, '');
               })
 
-            Text('StarFlowOhos · 阶段2 · 紫夜阅读（Purple Nocturne）')
+            Text('StarFlowOhos · 阶段2 · 蓝白阅读')
               .fontSize(10)
               .fontColor(ThemeTokens.TEXT_TERTIARY)
               .width('100%')
