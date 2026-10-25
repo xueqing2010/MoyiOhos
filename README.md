@@ -27,6 +27,14 @@ StarFlowOhos/
 
 各模块之间通过 `oh-package.json5` 的本地依赖互相引用，`entry` 依赖全部 core* 模块。
 
+## 语言构成
+
+- 应用代码以华为 **ArkTS（`.ets`）** 为主（136 个文件、约 3.6 万行）；GitHub 通过 `.gitattributes`
+  将 `*.ets` 按 **TypeScript** 统计，避免被误判为 Other。
+- `entry/src/main/cpp/llama.cpp` 是 vendored 的上游 C/C++ 源码（llama.cpp），已在 `.gitattributes`
+  标记 `linguist-vendored` / `linguist-detectable=false`，不计入本仓库语言比例。
+- 其余为零星 C++ NAPI 桥接、SVG 图标与工程配置。
+
 ## 构建与运行
 
 1. 安装 **DevEco Studio**（需要 HarmonyOS SDK **26.0.0**，`compatibleSdkVersion` / `targetSdkVersion` 均为 `26.0.0`）
@@ -50,10 +58,18 @@ hvigorw assembleHap --mode module -p product=default
 git update-index --skip-worktree build-profile.json5
 ```
 
-## 第三方组件
+## 第三方组件与许可
 
-- [llama.cpp](https://github.com/ggml-org/llama.cpp)（MIT）位于 `entry/src/main/cpp/llama.cpp`，含各 tokenizer 的 GGUF 词表文件
+- **StarFlow（星译 · Android 上游）** — [LGPL-3.0](https://github.com/xujunjiex/StarFlow)：本项目参照其信息架构、交互与视觉设计，在 HarmonyOS 上以 ArkTS 独立实现；不分发上游 Android 代码/二进制/模型。
+- **llama.cpp** — [MIT](https://github.com/ggml-org/llama.cpp)：位于 `entry/src/main/cpp/llama.cpp`（vendored），许可全文见该目录下 `LICENSE`。
+- **HarmonyOS SDK / Core Vision Kit / ArkUI** — 华为系统能力，按 HarmonyOS SDK 许可使用，不随仓库分发。
+- 本仓库不包含 GGUF 模型文件；模型许可归各自发布方。
+
+完整归属与许可文本见 [NOTICE.md](NOTICE.md) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 许可证
 
-本项目尚未声明开源许可证，如需授权使用请先联系仓库所有者。
+本项目以 **GNU Lesser General Public License v3.0（LGPL-3.0）** 发布，完整文本见 [LICENSE](LICENSE)。
+
+上游 StarFlow 采用 LGPL-3.0；本项目保留其归属说明，并以相同许可证发布 HarmonyOS ArkTS 实现。
+若分发修改版，请遵循 LGPL-3.0 关于源码提供、许可保留与修改说明的要求。

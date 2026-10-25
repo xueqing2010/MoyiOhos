@@ -1,0 +1,8 @@
+# ---- GitHub Linguist：语言统计规则 ----
+# 本项目应用层使用华为 ArkTS（.ets）；GitHub 默认不识别 .ets，这里统一按 TypeScript 统计。
+*.ets linguist-language=TypeScript
+*.d.ets linguist-language=TypeScript
+
+# 上游 llama.cpp 为 vendored 第三方源码（176 MB C/C++/CUDA/Metal），
+# 不计入本仓库语言比例，避免语言统计被第三方代码淹没。
+entry/src/main/cpp/llama.cpp/** linguist-vendored linguist-detectable=false
