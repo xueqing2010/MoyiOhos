@@ -1,3 +1,4 @@
+import { uiMaterial } from '@kit.ArkUI';
 import { ThemeTokens } from 'commons';
 import {
   ReaderAnimation,
@@ -235,6 +236,11 @@ export struct ReaderMenuView {
           .selectedColor(ThemeTokens.PRIMARY)
           .trackColor(ThemeTokens.SURFACE_VARIANT)
           .blockColor(ThemeTokens.PRIMARY)
+          .systemMaterial(new uiMaterial.ImmersiveMaterial({
+            style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+            interactive: true,
+            lightEffect: {}
+          }))
           .width('100%')
           .onChange((value: number, mode: SliderChangeMode) => {
             if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {

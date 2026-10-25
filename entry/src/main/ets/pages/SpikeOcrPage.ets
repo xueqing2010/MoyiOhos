@@ -229,7 +229,9 @@ export struct SpikeOcrPage {
     .title('OCR 诊断（P0-4）', {
       systemMaterial: new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        colorInvert: true
+        colorInvert: true,
+        interactive: true,
+        lightEffect: {}
       })
     })
     .backgroundColor(ThemeTokens.SURFACE)

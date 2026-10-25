@@ -327,7 +327,9 @@ export struct MangaTocPage {
     .title('目录', {
       systemMaterial: new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        colorInvert: true
+        colorInvert: true,
+        interactive: true,
+        lightEffect: {}
       })
     })
     .backgroundColor(ThemeTokens.SURFACE)

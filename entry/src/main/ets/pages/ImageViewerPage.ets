@@ -24,7 +24,9 @@ export struct ImageViewerPage {
     .title('图片预览', {
       systemMaterial: new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        colorInvert: true
+        colorInvert: true,
+        interactive: true,
+        lightEffect: {}
       })
     })
     .backgroundColor(ThemeTokens.SURFACE)

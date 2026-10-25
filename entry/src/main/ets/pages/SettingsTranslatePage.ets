@@ -304,6 +304,11 @@ export struct SettingsTranslatePage {
         .selectedColor(ThemeTokens.PRIMARY)
         .trackColor(ThemeTokens.SURFACE_VARIANT)
         .blockColor(ThemeTokens.PRIMARY_SOFT)
+        .systemMaterial(new uiMaterial.ImmersiveMaterial({
+          style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+          interactive: true,
+          lightEffect: {}
+        }))
         .width('100%')
         .onChange((v: number) => {
           pp.onChange(v);
@@ -526,7 +531,9 @@ export struct SettingsTranslatePage {
     .title('翻译设置', {
       systemMaterial: new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        colorInvert: true
+        colorInvert: true,
+        interactive: true,
+        lightEffect: {}
       })
     })
     .backgroundColor(ThemeTokens.SURFACE)

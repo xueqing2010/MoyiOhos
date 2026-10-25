@@ -322,7 +322,9 @@ export struct SpikeNapiPage {
     .title('NAPI 穿刺（P0-6）', {
       systemMaterial: new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        colorInvert: true
+        colorInvert: true,
+        interactive: true,
+        lightEffect: {}
       })
     })
     .backgroundColor(ThemeTokens.SURFACE)

@@ -1,3 +1,4 @@
+import { uiMaterial } from '@kit.ArkUI';
 import { ThemeTokens, toMediaUri } from 'commons';
 import { Artwork } from '../components/Artwork';
 import { AppEnv } from '../common/AppEnv';
@@ -237,6 +238,11 @@ export struct HistoryFullscreenPage {
             .selectedColor(ThemeTokens.PRIMARY)
             .trackColor('#33FFFFFF')
             .blockColor(ThemeTokens.PRIMARY)
+            .systemMaterial(new uiMaterial.ImmersiveMaterial({
+              style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+              interactive: true,
+              lightEffect: {}
+            }))
             .trackThickness(3)
             .onChange((value: number, mode: SliderChangeMode) => {
               this.goTo(Math.round(value));

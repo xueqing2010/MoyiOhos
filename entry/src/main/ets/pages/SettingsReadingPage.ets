@@ -292,6 +292,11 @@ export struct SettingsReadingPage {
         .selectedColor(ThemeTokens.PRIMARY)
         .trackColor(ThemeTokens.SURFACE_VARIANT)
         .blockColor(ThemeTokens.PRIMARY_SOFT)
+        .systemMaterial(new uiMaterial.ImmersiveMaterial({
+          style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+          interactive: true,
+          lightEffect: {}
+        }))
         .width('100%')
         .onChange((v: number) => {
           pp.onChange(v);
@@ -320,6 +325,11 @@ export struct SettingsReadingPage {
 
       Toggle({ type: ToggleType.Switch, isOn: pp.checked })
         .selectedColor(ThemeTokens.PRIMARY)
+        .systemMaterial(new uiMaterial.ImmersiveMaterial({
+          style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+          interactive: true,
+          lightEffect: {}
+        }))
         .onChange((isOn: boolean) => {
           pp.onChange(isOn);
         })
@@ -556,7 +566,9 @@ export struct SettingsReadingPage {
     .title('阅读设置', {
       systemMaterial: new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        colorInvert: true
+        colorInvert: true,
+        interactive: true,
+        lightEffect: {}
       })
     })
     .backgroundColor(ThemeTokens.SURFACE)

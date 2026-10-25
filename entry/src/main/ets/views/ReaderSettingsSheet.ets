@@ -1,3 +1,4 @@
+import { uiMaterial } from '@kit.ArkUI';
 import { ThemeTokens } from 'commons';
 import { LayoutSelfTest, SelfTestResult } from 'corerender';
 import {
@@ -119,6 +120,11 @@ export struct ReaderSettingsSheet {
         .layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: value })
         .selectedColor(ThemeTokens.PRIMARY)
+        .systemMaterial(new uiMaterial.ImmersiveMaterial({
+          style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+          interactive: true,
+          lightEffect: {}
+        }))
         .onChange((isOn: boolean) => {
           if (isOn !== value) {
             onToggle();
@@ -147,6 +153,11 @@ export struct ReaderSettingsSheet {
         .selectedColor(ThemeTokens.PRIMARY)
         .trackColor(ThemeTokens.SURFACE_VARIANT)
         .blockColor(ThemeTokens.PRIMARY)
+        .systemMaterial(new uiMaterial.ImmersiveMaterial({
+          style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+          interactive: true,
+          lightEffect: {}
+        }))
         .width('100%')
         .onChange((v: number, mode: SliderChangeMode) => {
           onChange(Math.round(v));
