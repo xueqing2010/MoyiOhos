@@ -10,9 +10,8 @@ import { DownloadProgress, DownloadService } from './DownloadService';
  * 模型与上游仓库 app/src/main/assets/ppocrv6 同源（9.5MB / 20MB），
  * 用户按需下载到应用 models 目录，避免默认安装包携带大模型。
  *
- * 说明：当前 HarmonyOS 端 OCR 仍由系统 Core Vision Kit 提供；
- * 已尝试接入 ONNX Runtime 鸿蒙 NAPI，但该运行时在模拟器上构造张量即原生崩溃，
- * 因此本地推理档位暂不启用，待真机/新版运行时验证。
+ * 说明：模型下载后，设置中可切换到「本地 PP-OCRv6（ONNX）」档位，
+ * 由 ONNX Runtime 鸿蒙 NAPI 在本机推理；系统 Core Vision Kit 仍为默认档位。
  */
 export class OcrModelInfo {
   key: string;

@@ -5,8 +5,11 @@ import { OcrRegion, PageTranslation, TranslateStatus, makePageTranslation } from
 import { EngineType, TranslateRequest, Translator } from 'coretranslate';
 import { OcrLang, OcrService } from 'coreocr';
 import { Log, toMediaUri } from 'commons';
+import { util } from '@kit.ArkTS';
 import { AppEnv } from '../common/AppEnv';
 import { PageRepository } from '../data/PageRepository';
+import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
+import { OcrModelService } from './OcrModelService';
 
 const TAG = 'PageTranslateService';
 const PREF_FILE = 'starflow_translate';
@@ -23,6 +26,29 @@ const KEY_ENGINE = 'text_engine';
  * 亦运行在 ArkTS 线程。
  */
 export class PageTranslateService {
+  private static dictText: string = '';
+
+  private static async configureOcr(): Promise<void> {
+    const tier = await SettingsRepository.getString(SettingsKeys.OCR_ENGINE_TIER, 'system');
+    const service = OcrService.getInstance();
+    if (tier !== 'local') {
+      service.setLocalEnabled(false);
+      return;
+    }
+    if (!OcrModelService.localModelsReady()) {
+      throw new Error('本地 OCR 模型未下载：请到「设置 → OCR」下载检测与识别模型');
+    }
+    if (PageTranslateService.dictText.length === 0) {
+      const bytes = await AppEnv.getInstance().getContext().resourceManager.getRawFileContent('ppocrv6_dict.txt');
+      const decoder: util.TextDecoder = util.TextDecoder.create('utf-8');
+      PageTranslateService.dictText = decoder.decodeToString(bytes);
+    }
+    const models = OcrModelService.list();
+    service.configureLocal(OcrModelService.path(models[0]), OcrModelService.path(models[1]),
+      PageTranslateService.dictText);
+    service.setLocalEnabled(true);
+  }
+
   static async translatePage(pageId: number, engineType: EngineType): Promise<PageTranslation> {
     return PageTranslateService.run(pageId, engineType);
   }
@@ -40,8 +66,9 @@ export class PageTranslateService {
     const lang = await PageTranslateService.loadOcrLang();
     let pixelMap: image.PixelMap | undefined = undefined;
     try {
+      await PageTranslateService.configureOcr();
       pixelMap = await PageTranslateService.decode(page.imagePath);
-      const regions: Array<OcrRegion> = await OcrService.getInstance().recognize(pixelMap, lang);
+      const regions: Array<OcrRegion> = await OcrService.getInstance().recognize(pixelMap, lang, page.imagePath);
       const translator: Translator = AppEnv.getInstance().engineRegistry.get(engineType);
 
       const translations: Array<string> = [];

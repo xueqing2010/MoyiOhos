@@ -165,28 +165,19 @@ struct Index {
 
   @Builder
   phoneTab(index: number, icon: Resource, label: Resource) {
-    Column({ space: 1 }) {
+    Column({ space: 2 }) {
       Image(icon)
         .width(22)
         .height(22)
         .fillColor(this.currentTab === index ? ThemeTokens.PRIMARY : ThemeTokens.TEXT_HINT)
-        .shadow(this.currentTab === index
-          ? { radius: 8, color: ThemeTokens.PRIMARY, offsetX: 0, offsetY: 0 }
-          : { radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 })
       Text(label)
         .fontSize(10)
         .fontWeight(this.currentTab === index ? FontWeight.Medium : FontWeight.Normal)
         .fontColor(this.currentTab === index ? ThemeTokens.PRIMARY : ThemeTokens.TEXT_HINT)
     }
     .justifyContent(FlexAlign.Center)
-    .width(58)
-    .height(48)
-    .borderRadius(ThemeTokens.RADIUS_PILL)
-    // 沉浸光感：选中项使用低透明度主色胶囊，悬浮在毛玻璃材质上。
-    .backgroundColor(this.currentTab === index
-      ? (ThemeTokens.isLight() ? '#1A1F6FEB' : '#26A78BFA')
-      : Color.Transparent)
-    .animation({ duration: ThemeTokens.DURATION_FAST, curve: Curve.EaseOut })
+    .width('100%')
+    .height('100%')
   }
 
   @Builder
@@ -317,40 +308,48 @@ struct Index {
         this.phoneTabContent(0)
       }
       .tabBar(this.phoneTab(0, $r('app.media.ic_tab_shelf'), $r('app.string.tab_shelf_books')))
+      .expandSafeArea([SafeAreaType.SYSTEM])
 
       TabContent() {
         this.phoneTabContent(1)
       }
       .tabBar(this.phoneTab(1, $r('app.media.ic_tab_import'), $r('app.string.tab_import')))
+      .expandSafeArea([SafeAreaType.SYSTEM])
 
       TabContent() {
         this.phoneTabContent(2)
       }
       .tabBar(this.phoneTab(2, $r('app.media.ic_tab_translate'), $r('app.string.tab_translate')))
+      .expandSafeArea([SafeAreaType.SYSTEM])
 
       TabContent() {
         this.phoneTabContent(3)
       }
       .tabBar(this.phoneTab(3, $r('app.media.ic_tab_history'), $r('app.string.tab_history')))
+      .expandSafeArea([SafeAreaType.SYSTEM])
 
       TabContent() {
         this.phoneTabContent(4)
       }
       .tabBar(this.phoneTab(4, $r('app.media.ic_tab_me'), $r('app.string.tab_me')))
+      .expandSafeArea([SafeAreaType.SYSTEM])
     }
     .vertical(false)
     .barMode(BarMode.Fixed)
     .scrollable(true)
-    .barHeight(64)
+    .barHeight(56)
     .barOverlap(true)
     .barPosition(BarPosition.End)
     .barFloatingStyle({
-      barBottomMargin: 10,
+      barBottomMargin: 8,
+      adaptToHandedness: true,
+      // 官方推荐：悬浮 Tab 使用 ULTRA_THIN 材质；自定义 tabBar 不使用 colorInvert
+      // （反色只对 BottomTabBarStyle + 系统颜色资源生效，直接开会让材质发白）。
       systemMaterial: this.immersiveSupported
         ? new uiMaterial.ImmersiveMaterial({
-          style: uiMaterial.ImmersiveStyle.THIN,
-          colorInvert: true,
-          interactive: true
+          style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+          interactive: true,
+          lightEffect: {}
         })
         : undefined
     })

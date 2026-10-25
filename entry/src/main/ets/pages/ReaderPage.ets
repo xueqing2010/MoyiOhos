@@ -30,6 +30,8 @@ import { ReaderMenuView } from '../views/ReaderMenuView';
 import { ReaderSettingsSheet, cloneReaderSettings } from '../views/ReaderSettingsSheet';
 import { BatchPanel } from '../views/BatchPanel';
 import { PageTranslateService } from '../service/PageTranslateService';
+import { OcrModelService } from '../service/OcrModelService';
+import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { BatchState } from '../service/BatchTranslateService';
 import { ExportMode, ExportResult } from '../service/ExportService';
 import { MangaTocJump, makeMangaTocParams } from './MangaTocPage';
@@ -501,6 +503,11 @@ export struct ReaderPage {
 
   private async detectOcr(): Promise<void> {
     try {
+      const tier = await SettingsRepository.getString(SettingsKeys.OCR_ENGINE_TIER, 'system');
+      if (tier === 'local') {
+        this.ocrAvailable = OcrModelService.localModelsReady();
+        return;
+      }
       this.ocrAvailable = await OcrService.getInstance().probe();
     } catch (e) {
       this.ocrAvailable = false;

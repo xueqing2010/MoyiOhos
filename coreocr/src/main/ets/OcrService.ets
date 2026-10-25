@@ -3,6 +3,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { image } from '@kit.ImageKit';
 import { OcrRegion, PixelRect, makeOcrRegion, makePixelRect } from 'coremodel';
 import { Log } from 'commons';
+import { LocalOcrConfig, LocalOcrEngine } from './LocalOcrEngine';
 
 /**
  * App-level OCR language hint. The system textRecognition engine is
@@ -27,9 +28,35 @@ export class OcrService {
   private initialized: boolean = false;
   private lastProbeDetail: string = '未探测';
   private lastLang: OcrLang = OcrLang.JPN;
+  private localEnabled: boolean = false;
+  private localConfig: LocalOcrConfig | undefined = undefined;
 
   static getInstance(): OcrService {
     return OcrService.instance;
+  }
+
+  configureLocal(detPath: string, recPath: string, dictText: string): void {
+    this.localConfig = { detPath: detPath, recPath: recPath, dictText: dictText };
+  }
+
+  setLocalEnabled(enabled: boolean): void {
+    this.localEnabled = enabled;
+  }
+
+  isLocalEnabled(): boolean {
+    return this.localEnabled;
+  }
+
+  /** 直接对图片路径跑本地模型（自测/批处理用，不依赖 PixelMap）。 */
+  async recognizeLocal(pagePath: string): Promise<Array<OcrRegion>> {
+    if (this.localConfig === undefined) {
+      throw new Error('本地模型未配置');
+    }
+    const engine = LocalOcrEngine.getInstance();
+    await engine.init(this.localConfig);
+    this.localEnabled = true;
+    this.lastProbeDetail = '本地 PP-OCRv6（ONNX Runtime）';
+    return await engine.recognize(pagePath);
   }
 
   /** Capability probe; throws a readable Error when OCR is unavailable (US-5 scene 7). */
@@ -78,7 +105,14 @@ export class OcrService {
   }
 
   /** Run line-level recognition; returns regions in original-pixel coords. */
-  async recognize(pixelMap: image.PixelMap, lang: OcrLang = OcrLang.JPN): Promise<Array<OcrRegion>> {
+  async recognize(pixelMap: image.PixelMap, lang: OcrLang = OcrLang.JPN,
+    pagePath?: string): Promise<Array<OcrRegion>> {
+    if (this.localEnabled && this.localConfig !== undefined && pagePath !== undefined) {
+      const engine = LocalOcrEngine.getInstance();
+      await engine.init(this.localConfig);
+      this.lastProbeDetail = '本地 PP-OCRv6（ONNX Runtime）';
+      return await engine.recognize(pagePath);
+    }
     await this.ensureInit(lang);
     const visionInfo: textRecognition.VisionInfo = { pixelMap: pixelMap };
     const result: textRecognition.TextRecognitionResult =
@@ -99,6 +133,7 @@ export class OcrService {
   }
 
   async release(): Promise<void> {
+    LocalOcrEngine.getInstance().release();
     if (!this.initialized) {
       return;
     }

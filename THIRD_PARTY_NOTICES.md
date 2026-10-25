@@ -9,7 +9,8 @@
 - 关系：本项目为 HarmonyOS / ArkTS 的独立实现，参照上游信息架构、交互与视觉设计；
   不分发上游 Android 代码、二进制或模型。
 - 上游版权归其作者与贡献者所有；本项目保留该归属说明，并以 LGPL-3.0 发布自身代码，便于遵循同类许可义务。
-- 上游 Android 工程另含 RTranslator、RapidOCR、ONNX Runtime、manga-ocr 等第三方组件（详见上游仓库 `licenses/NOTICE.txt`）。本仓库未整合上游 Android 原生实现及其依赖，因此不随本仓库分发这些组件，其许可义务由上游/各自项目承担。
+- 上游 Android 工程另含 RTranslator、RapidOCR、ONNX Runtime、manga-ocr 等第三方组件（详见上游仓库 `licenses/NOTICE.txt`）。
+- 本仓库通过 OHPM 引入 ONNX Runtime 鸿蒙 NAPI 以运行用户下载的 PP-OCRv6 模型；HAP 内含对应 arm64 原生库（见第 6 节）。不随安装包分发 PP-OCR 模型文件。
 
 ## 2. llama.cpp — MIT
 
@@ -45,8 +46,17 @@ SOFTWARE.
 
 ## 4. 模型文件
 
-本仓库不包含 GGUF 模型。用户下载/导入的模型遵循模型发布方许可。
+- 本仓库不包含 GGUF / ONNX 模型文件；用户在应用内下载或导入的模型遵循模型发布方许可。
+- PP-OCRv6 det/rec 模型与 `ppocrv6_dict.txt` 来自上游 StarFlow 的 `app/src/main/assets/ppocrv6`（LGPL-3.0 上游仓库；PP-OCR 原始项目为 PaddleOCR，Apache-2.0）。应用仅将字典打入安装包，模型由用户按需下载。
 
-## 5. 本项目自身
+## 5. ONNX Runtime / @ohos/onnxruntime / AKI
+
+- **ONNX Runtime** — MIT License，https://github.com/microsoft/onnxruntime
+- **@ohos/onnxruntime**（onnxruntime-napi）— MIT License，https://gitcode.com/OpenHarmony-ApplicationTPC/ohos_onnxruntime
+- **@ohos/aki** — Apache License 2.0，https://gitcode.com/openharmony-sig/aki
+
+HAP 内含上述项目的 arm64-v8a 原生库（`liblibrary.so`、`libaki_jsbind.so` 及 `libc++_shared.so`），用于本地 PP-OCR 推理。ONNX Runtime 自身的第三方组件清单见其发行包 `ThirdPartyNotices.txt`。
+
+## 6. 本项目自身
 
 StarFlowOhos（星译 StarFlow · HarmonyOS）— LGPL-3.0，完整文本见 [LICENSE](LICENSE)。

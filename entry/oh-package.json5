@@ -12,7 +12,9 @@
     "coretranslate": "file:../coretranslate",
     "corerender": "file:../corerender",
     "corenovel": "file:../corenovel",
-    "libllamacpp": "file:./src/main/cpp/types/libllamacpp"
+    "libllamacpp": "file:./src/main/cpp/types/libllamacpp",
+    "@ohos/onnxruntime": "1.0.0",
+    "@ohos/aki": "1.2.26"
   },
   "devDependencies": {},
   "dynamicDependencies": {}

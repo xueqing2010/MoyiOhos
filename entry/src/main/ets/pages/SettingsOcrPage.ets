@@ -1,6 +1,9 @@
 import { uiMaterial } from '@kit.ArkUI';
 import { ThemeTokens, WindowSizeClass, observeBreakpoint, Log } from 'commons';
+import fs from '@ohos.file.fs';
+import { util } from '@kit.ArkTS';
 import { OcrService } from 'coreocr';
+import { AppEnv } from '../common/AppEnv';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { OcrModelInfo, OcrModelService } from '../service/OcrModelService';
 
@@ -80,6 +83,9 @@ export struct SettingsOcrPage {
   @State recReady: boolean = false;
   @State downloadingKey: string = '';
   @State modelPercent: number = 0;
+  @State localTesting: boolean = false;
+  @State localTestResult: string = '';
+  private dictText: string = '';
   private models: Array<OcrModelInfo> = OcrModelService.list();
   private stopBreakpoint: (() => void) | undefined = undefined;
   private langs: Array<OcrLangOption> = [
@@ -90,7 +96,7 @@ export struct SettingsOcrPage {
   ];
   @State tiers: Array<OcrTier> = [
     new OcrTier('system', '系统 Core Vision Kit', 'HarmonyOS 官方文字识别（textRecognition），本机离线推理。', true),
-    new OcrTier('local', '本地 PP-OCRv6（ONNX）', 'ONNX Runtime NAPI 在当前模拟器上构造张量崩溃，待真机/新版运行时验证后启用。', false),
+    new OcrTier('local', '本地 PP-OCRv6（ONNX）', '下载 det + rec 模型后，用 ONNX Runtime 在本机推理，不联网上传。', false),
     new OcrTier('cloud', '云端 OCR 服务', '需要第三方账号与网络上传，与本地优先的隐私策略冲突，未接入。', false)
   ];
 
@@ -122,8 +128,8 @@ export struct SettingsOcrPage {
     this.tiers = [
       new OcrTier('system', '系统 Core Vision Kit', 'HarmonyOS 官方文字识别（textRecognition），本机离线推理。', true),
       new OcrTier('local', '本地 PP-OCRv6（ONNX）',
-        ready ? '模型已下载，但 ONNX Runtime NAPI 在当前模拟器崩溃，暂不可启用。'
-          : '请先下载检测与识别模型；推理运行时兼容性验证中。', false),
+        ready ? '模型已就绪：ONNX Runtime 本机推理，选择后翻译页使用本地 OCR。'
+          : '请先下载检测与识别模型；下载完成后本档位自动可用。', ready),
       new OcrTier('cloud', '云端 OCR 服务', '需要第三方账号与网络上传，与本地优先的隐私策略冲突，未接入。', false)
     ];
   }
@@ -208,12 +214,55 @@ export struct SettingsOcrPage {
 
   private async pickTier(tier: OcrTier): Promise<void> {
     if (!tier.available) {
-      this.flash(tier.id === 'local' ? '本地推理运行时兼容性验证中，暂不可用' : '该档位当前版本未接入');
+      this.flash(tier.id === 'local' ? '请先下载 det 与 rec 模型' : '该档位当前版本未接入');
       return;
     }
     this.ocrTier = tier.id;
     await SettingsRepository.set(SettingsKeys.OCR_ENGINE_TIER, tier.id);
     this.flash(tier.id === 'local' ? '已启用本地 OCR（翻译时生效）' : 'OCR 引擎档位已保存');
+  }
+
+  /** 自测：用 rawfile 示例页跑本地 det+rec，验证 ONNX 推理链路。 */
+  private async testLocal(): Promise<void> {
+    if (this.localTesting) {
+      return;
+    }
+    if (!this.detReady || !this.recReady) {
+      this.flash('请先下载检测与识别模型');
+      return;
+    }
+    this.localTesting = true;
+    this.localTestResult = '加载模型并推理中…';
+    try {
+      const ctx = AppEnv.getInstance().getContext();
+      if (this.dictText.length === 0) {
+        const dictBytes = await ctx.resourceManager.getRawFileContent('ppocrv6_dict.txt');
+        this.dictText = util.TextDecoder.create('utf-8').decodeToString(dictBytes);
+      }
+      const service = OcrService.getInstance();
+      service.configureLocal(OcrModelService.path(this.models[0]), OcrModelService.path(this.models[1]),
+        this.dictText);
+      const png = await ctx.resourceManager.getRawFileContent('demo/manga/page_01.png');
+      const temp = ctx.cacheDir + '/ocr-selftest.png';
+      const file = fs.openSync(temp, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
+      try {
+        fs.writeSync(file.fd, png.buffer);
+      } finally {
+        fs.closeSync(file);
+      }
+      const t0 = Date.now();
+      const regions = await service.recognizeLocal(temp);
+      const ms = Date.now() - t0;
+      let sample = '';
+      for (let i = 0; i < regions.length && i < 3; i++) {
+        sample += regions[i].text + (i < 2 ? ' / ' : '');
+      }
+      this.localTestResult = '本地 OCR 完成：' + regions.length + ' 行，' + ms + ' ms' +
+        (sample.length > 0 ? ' · ' + sample : '');
+    } catch (e) {
+      this.localTestResult = '本地 OCR 失败：' + (e instanceof Error ? e.message : String(e));
+    }
+    this.localTesting = false;
   }
 
   private flash(text: string): void {
@@ -384,7 +433,7 @@ export struct SettingsOcrPage {
               ForEach(this.tiers, (tier: OcrTier) => {
                 this.tierRow({ tier: tier, active: this.ocrTier === tier.id })
               }, (tier: OcrTier) => tier.id)
-              Text('档位偏好会保存；本地档位在 ONNX Runtime 兼容性验证通过后启用，云端档位未接入。')
+              Text('档位偏好会保存：选择本地后，单页/批量翻译使用 ONNX Runtime 在本机识别，不上传图片；云端档位未接入。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)
                 .width('100%')
@@ -396,7 +445,26 @@ export struct SettingsOcrPage {
               ForEach(this.models, (info: OcrModelInfo) => {
                 this.modelRow(info)
               }, (info: OcrModelInfo) => info.key)
-              Text('模型来自上游 StarFlow（LGPL-3.0）的 ppocrv6 assets；本地推理依赖 ONNX Runtime 鸿蒙 NAPI，当前模拟器上张量构造会触发原生崩溃，已停用，待真机/新版运行时验证后启用。')
+              Button(this.localTesting ? '本地推理中…' : '本地模型自测')
+                .width('100%')
+                .height(36)
+                .fontSize(ThemeTokens.FONT_SMALL)
+                .fontColor(ThemeTokens.PRIMARY)
+                .backgroundColor(ThemeTokens.SURFACE_VARIANT)
+                .borderRadius(ThemeTokens.RADIUS_PILL)
+                .margin({ top: 6 })
+                .enabled(!this.localTesting && this.detReady && this.recReady)
+                .onClick(() => {
+                  this.testLocal();
+                })
+              if (this.localTestResult.length > 0) {
+                Text(this.localTestResult)
+                  .fontSize(ThemeTokens.FONT_SMALL)
+                  .fontColor(this.localTestResult.startsWith('本地 OCR 完成') ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_HINT)
+                  .width('100%')
+                  .lineHeight(17)
+              }
+              Text('模型来自上游 StarFlow（LGPL-3.0）的 ppocrv6 assets；字典随包分发，首次加载模型约需数秒。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)
                 .width('100%')
