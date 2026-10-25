@@ -1,0 +1,104 @@
+import fs from '@ohos.file.fs';
+import { makeDownloadTask } from 'coremodel';
+import { Log } from 'commons';
+import { DownloadRepository } from '../data/DownloadRepository';
+import { DownloadProgress, DownloadService } from './DownloadService';
+
+/**
+ * 上游 StarFlow 的 PP-OCRv6 小模型（det + rec）可选下载。
+ *
+ * 模型与上游仓库 app/src/main/assets/ppocrv6 同源（9.5MB / 20MB），
+ * 用户按需下载到应用 models 目录，避免默认安装包携带大模型。
+ *
+ * 说明：当前 HarmonyOS 端 OCR 仍由系统 Core Vision Kit 提供；
+ * 本地 ONNX 推理（onnxruntime NAPI）接入后即可切换到这些模型。
+ */
+export class OcrModelInfo {
+  key: string;
+  name: string;
+  fileName: string;
+  url: string;
+  sizeBytes: number;
+  desc: string;
+
+  constructor(key: string, name: string, fileName: string, url: string, sizeBytes: number, desc: string) {
+    this.key = key;
+    this.name = name;
+    this.fileName = fileName;
+    this.url = url;
+    this.sizeBytes = sizeBytes;
+    this.desc = desc;
+  }
+}
+
+export class OcrModelService {
+  static readonly DET_KEY: string = 'OCR_PP_DET_V6';
+  static readonly REC_KEY: string = 'OCR_PP_REC_V6';
+  private static readonly BASE: string =
+    'https://raw.githubusercontent.com/xujunjiex/StarFlow/master/app/src/main/assets/ppocrv6';
+
+  static list(): Array<OcrModelInfo> {
+    const out: Array<OcrModelInfo> = [];
+    out.push(new OcrModelInfo(OcrModelService.DET_KEY, 'PP-OCRv6 检测模型', 'ppocrv6_det_v6_small.onnx',
+      OcrModelService.BASE + '/det_v6_small.onnx', 9_500_000, '文本行/气泡检测，上游 ppocrv6 det_v6_small.onnx'));
+    out.push(new OcrModelInfo(OcrModelService.REC_KEY, 'PP-OCRv6 识别模型', 'ppocrv6_rec_v6_small.onnx',
+      OcrModelService.BASE + '/rec_v6_small.onnx', 20_000_000, '日/中/英文字识别，上游 ppocrv6 rec_v6_small.onnx'));
+    return out;
+  }
+
+  static path(info: OcrModelInfo): string {
+    return DownloadService.finalPath(info.fileName);
+  }
+
+  static isDownloaded(info: OcrModelInfo): boolean {
+    try {
+      return fs.accessSync(OcrModelService.path(info));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static localModelsReady(): boolean {
+    const list = OcrModelService.list();
+    for (let i = 0; i < list.length; i++) {
+      if (!OcrModelService.isDownloaded(list[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static async download(info: OcrModelInfo, onProgress: (percent: number) => void): Promise<void> {
+    const task = makeDownloadTask(info.key, info.name, info.url, info.fileName);
+    task.totalBytes = info.sizeBytes;
+    await DownloadRepository.upsert(task);
+    const svc = DownloadService.getInstance();
+    const listener = (p: DownloadProgress): void => {
+      if (p.modelKey !== info.key) {
+        return;
+      }
+      const total = p.totalBytes > 0 ? p.totalBytes : info.sizeBytes;
+      const pct = total > 0 ? Math.min(100, Math.round(p.downloadedBytes * 100 / total)) : 0;
+      onProgress(pct);
+    };
+    svc.onProgress(listener);
+    try {
+      await svc.start(task);
+      onProgress(100);
+      Log.info('OcrModelService', `downloaded ${info.name} -> ${OcrModelService.path(info)}`);
+    } finally {
+      svc.offProgress(listener);
+    }
+  }
+
+  static async remove(info: OcrModelInfo): Promise<void> {
+    await DownloadService.getInstance().remove(info.key);
+  }
+
+  static formatSize(bytes: number): string {
+    if (bytes >= 1024 * 1024) {
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    return Math.round(bytes / 1024) + ' KB';
+  }
+}

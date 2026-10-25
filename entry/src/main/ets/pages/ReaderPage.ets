@@ -230,6 +230,9 @@ struct ReaderPageLayer {
       dy = fit.dy;
     }
     const opts = this.buildOptions();
+    // 页面像素边界：把 OCR 框裁剪到页面内，避免白块越界（页面渲染错位）。
+    opts.pageWidth = this.pageSize.width;
+    opts.pageHeight = this.pageSize.height;
     const useTranslated = this.mode === ReaderMode.TRANS;
     const regions: Array<OverlayRegion> = [];
     for (let i = 0; i < pt.ocr.length; i++) {
@@ -253,7 +256,14 @@ struct ReaderPageLayer {
     const colors = this.filterInvert
       ? OverlayColors.make('#15121F', '#E8E4F5')
       : OverlayColors.make('#FFFFFF', '#1A1A1A');
+    // 画布可能覆盖整页容器（含留白），把覆盖层裁剪到页面图像矩形内，
+    // 避免任何越界 OCR 框把白块画到页外（页面渲染错位）。
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(dx, dy, this.pageSize.width * scale, this.pageSize.height * scale);
+    ctx.clip();
     OverlayRenderer.paintPlan(ctx, items, scale, dx, dy, colors);
+    ctx.restore();
   }
 
   build() {

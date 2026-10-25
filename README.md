@@ -8,6 +8,8 @@
 - **小说阅读**：TXT / EPUB / ZIP-HTML 解析、章节切分、分页器、阅读进度保存
 - **翻译引擎**：统一 `Translator` 抽象，内置必应、OpenAI 兼容接口、本地 llama.cpp 三种实现
 - **本地推理**：内置 llama.cpp（`entry/src/main/cpp/llama.cpp`），支持加载 GGUF 模型离线翻译
+- **OCR 模型可选下载**：设置→OCR 中可按需下载上游 PP-OCRv6 det/rec 模型（约 9 MB / 19 MB，不随安装包分发）；本地 ONNX 推理接入后启用
+- **渲染健壮性**：译文白块按页面像素边界裁剪，并限制在页面图像画布内，避免越界/错位
 - **数据层**：基于 RDB 的实体、DAO 与仓库封装
 
 ## 工程结构

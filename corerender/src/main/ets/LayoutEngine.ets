@@ -32,6 +32,10 @@ export interface RenderOptions {
   lineSpacing?: number;
   /** 额外字距（横排字距 / 竖排列内字距），单位 = ×字号，0 为自然间距。 */
   charSpacing?: number;
+  /** 页面像素宽（可选）：用于把 OCR 框裁剪到页面内，避免白块越界。 */
+  pageWidth?: number;
+  /** 页面像素高（可选）。 */
+  pageHeight?: number;
 }
 
 /** One positioned character; x/y mark the char cell CENTER (display/page coords). */

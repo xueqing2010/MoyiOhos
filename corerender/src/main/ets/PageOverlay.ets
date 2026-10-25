@@ -145,7 +145,28 @@ export class PageOverlay {
       if (region.box.w <= 0 || region.box.h <= 0) {
         continue;
       }
-      const box: DisplayRect = { x: region.box.x, y: region.box.y, w: region.box.w, h: region.box.h };
+      let bx = region.box.x;
+      let by = region.box.y;
+      let bw = region.box.w;
+      let bh = region.box.h;
+      // OCR/导入的框可能越出页面（例如示例数据或误识别），先裁剪到页面内，
+      // 否则白块会画到漫画页面之外，表现为“页面渲染错位/白块越界”。
+      const pageW = opts.pageWidth !== undefined ? opts.pageWidth : 0;
+      const pageH = opts.pageHeight !== undefined ? opts.pageHeight : 0;
+      if (pageW > 0 && pageH > 0) {
+        const left = Math.max(0, Math.min(bx, pageW));
+        const top = Math.max(0, Math.min(by, pageH));
+        const right = Math.max(0, Math.min(bx + bw, pageW));
+        const bottom = Math.max(0, Math.min(by + bh, pageH));
+        bx = left;
+        by = top;
+        bw = right - left;
+        bh = bottom - top;
+        if (bw <= 0 || bh <= 0) {
+          continue;
+        }
+      }
+      const box: DisplayRect = { x: bx, y: by, w: bw, h: bh };
       boxes.push(box);
       texts.push(text);
     }

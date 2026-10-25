@@ -2,6 +2,7 @@ import { uiMaterial } from '@kit.ArkUI';
 import { ThemeTokens, WindowSizeClass, observeBreakpoint, Log } from 'commons';
 import { OcrService } from 'coreocr';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
+import { OcrModelInfo, OcrModelService } from '../service/OcrModelService';
 
 /** OCR 语言选项（值与 coreocr OcrLang 一致）。 */
 class OcrLangOption {
@@ -75,6 +76,11 @@ export struct SettingsOcrPage {
   @State probeDetail: string = '未探测';
   @State hint: string = '';
   @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
+  @State detReady: boolean = false;
+  @State recReady: boolean = false;
+  @State downloadingKey: string = '';
+  @State modelPercent: number = 0;
+  private models: Array<OcrModelInfo> = OcrModelService.list();
   private stopBreakpoint: (() => void) | undefined = undefined;
   private langs: Array<OcrLangOption> = [
     new OcrLangOption('ja', '日本語', '日文漫画/轻小说'),
@@ -106,6 +112,90 @@ export struct SettingsOcrPage {
     this.ocrLang = await SettingsRepository.getString(SettingsKeys.OCR_LANG, 'ja');
     this.ocrTier = await SettingsRepository.getString(SettingsKeys.OCR_ENGINE_TIER, 'system');
     this.probeDetail = OcrService.getInstance().getProbeDetail();
+    this.refreshModels();
+  }
+
+  private refreshModels(): void {
+    this.detReady = OcrModelService.isDownloaded(this.models[0]);
+    this.recReady = OcrModelService.isDownloaded(this.models[1]);
+  }
+
+  private isReady(info: OcrModelInfo): boolean {
+    return info.key === OcrModelService.DET_KEY ? this.detReady : this.recReady;
+  }
+
+  private async downloadModel(info: OcrModelInfo): Promise<void> {
+    if (this.downloadingKey.length > 0) {
+      return;
+    }
+    this.downloadingKey = info.key;
+    this.modelPercent = 0;
+    try {
+      await OcrModelService.download(info, (pct: number) => {
+        this.modelPercent = pct;
+      });
+      this.refreshModels();
+      this.flash(`${info.name} 下载完成`);
+    } catch (e) {
+      const msg = `${e}`;
+      this.flash(msg.indexOf('超时') >= 0 || msg.indexOf('网络') >= 0
+        ? '下载失败：请检查网络后重试'
+        : `下载失败：${msg}`);
+    }
+    this.downloadingKey = '';
+    this.modelPercent = 0;
+  }
+
+  private async removeModel(info: OcrModelInfo): Promise<void> {
+    try {
+      await OcrModelService.remove(info);
+      this.refreshModels();
+      this.flash(`已删除 ${info.name}`);
+    } catch (e) {
+      this.flash(`删除失败：${e}`);
+    }
+  }
+
+  @Builder
+  modelRow(info: OcrModelInfo) {
+    Row({ space: 10 }) {
+      Column({ space: 3 }) {
+        Text(info.name)
+          .fontSize(ThemeTokens.FONT_CAPTION)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(ThemeTokens.TEXT_PRIMARY)
+        Text(info.desc)
+          .fontSize(ThemeTokens.FONT_SMALL)
+          .fontColor(ThemeTokens.TEXT_HINT)
+          .maxLines(2)
+        Text(this.isReady(info)
+          ? `已下载 · ${OcrModelService.formatSize(info.sizeBytes)} · ${OcrModelService.path(info)}`
+          : `未下载 · ${OcrModelService.formatSize(info.sizeBytes)}`)
+          .fontSize(10)
+          .fontColor(this.isReady(info) ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_TERTIARY)
+          .maxLines(2)
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Button(this.downloadingKey === info.key ? `${this.modelPercent}%`
+        : (this.isReady(info) ? '删除' : '下载'))
+        .fontSize(ThemeTokens.FONT_SMALL)
+        .fontColor(this.isReady(info) ? ThemeTokens.WARN : ThemeTokens.TEXT_ON_PRIMARY)
+        .backgroundColor(this.isReady(info) ? ThemeTokens.SURFACE_VARIANT : ThemeTokens.PRIMARY)
+        .borderRadius(ThemeTokens.RADIUS_PILL)
+        .height(32)
+        .enabled(this.downloadingKey.length === 0 || this.downloadingKey === info.key)
+        .onClick(() => {
+          if (this.isReady(info)) {
+            this.removeModel(info);
+          } else {
+            this.downloadModel(info);
+          }
+        })
+    }
+    .width('100%')
+    .padding({ top: 8, bottom: 8 })
   }
 
   private async pickTier(tier: OcrTier): Promise<void> {
@@ -287,6 +377,18 @@ export struct SettingsOcrPage {
                 this.tierRow({ tier: tier, active: this.ocrTier === tier.id })
               }, (tier: OcrTier) => tier.id)
               Text('档位偏好会保存；系统档位是当前唯一可用实现，本地/云端档位为后续预留。')
+                .fontSize(ThemeTokens.FONT_SMALL)
+                .fontColor(ThemeTokens.TEXT_HINT)
+                .width('100%')
+                .lineHeight(17)
+            }
+
+            this.sectionTitle('上游 OCR 模型（可选下载）', 'PP-OCRv6 det / rec，不随安装包分发')
+            OcrSettingCard() {
+              ForEach(this.models, (info: OcrModelInfo) => {
+                this.modelRow(info)
+              }, (info: OcrModelInfo) => info.key)
+              Text('模型来自上游 StarFlow（LGPL-3.0）的 ppocrv6 assets；下载后保存在应用 models 目录。当前 OCR 仍由系统 Core Vision Kit 提供，本地 ONNX 推理接入后可切换到这些模型。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)
                 .width('100%')

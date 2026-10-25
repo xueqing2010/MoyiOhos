@@ -335,7 +335,19 @@ export class ExportService {
         regions.push(makeOverlayRegion(box, r.text, text));
       }
       // 页面像素坐标系排版 → 逐字绘制（scale=1）；合并白块与屏幕端一致。
-      const items: Array<OverlayItem> = PageOverlay.build(regions, opts, true, whiteMerge);
+      // 传入页面像素边界，PageOverlay 会把越界 OCR 框裁剪到页面内，避免导出图白块越界。
+      const pageOpts: RenderOptions = {
+        orientation: opts.orientation,
+        verticalDirection: opts.verticalDirection,
+        fontSizeMode: opts.fontSizeMode,
+        fixedFontSize: opts.fixedFontSize,
+        padding: opts.padding,
+        lineSpacing: opts.lineSpacing,
+        charSpacing: opts.charSpacing,
+        pageWidth: w,
+        pageHeight: h
+      };
+      const items: Array<OverlayItem> = PageOverlay.build(regions, pageOpts, true, whiteMerge);
       const colors: OverlayColors = OverlayColors.make('#FFFFFF', '#1A1A1A');
       // 离屏画布用 LengthMetricsUnit.PX 创建，字号单位必须是 px（与页面像素 1:1）。
       OverlayRenderer.paintPlan(ctx, items, 1, 0, 0, colors, 'px');
