@@ -4,6 +4,7 @@ import { EngineType } from 'coretranslate';
 import { NovelDisplayMode, NovelPage, Paginator } from 'corenovel';
 import { asNovelReaderParams, makeNovelReaderParams, Routes } from '../common/Routes';
 import { Artwork } from '../components/Artwork';
+import { PreTranslateService } from '../service/PreTranslateService';
 import { AppEnv } from '../common/AppEnv';
 import { NovelBg, NovelBatchState, NovelReaderSession, NovelReaderSettings, NovelViewModel } from '../viewmodel/NovelViewModel';
 import { NovelTranslateResult, NovelTranslateService } from '../service/NovelTranslateService';
@@ -230,6 +231,7 @@ export struct NovelReaderPage {
       this.pageIndex = Paginator.pageOfOffset(this.pages, offset);
     }
     this.saveProgress();
+    PreTranslateService.prefetchNovel(this.novelId, this.chapterIndex);
   }
 
   // ---------- 翻页与进度 ----------
@@ -448,13 +450,13 @@ export struct NovelReaderPage {
     this.translating = false;
   }
 
-  private startBatch(): void {
+  private startBatch(wholeBook: boolean = false): void {
     if (this.batch.running || this.novelId < 0) {
       return;
     }
     const self = this;
     NovelTranslateService.loadEngineType().then((engine: EngineType) => {
-      NovelViewModel.startBatch(self.novelId, self.chapterIndex, BATCH_CHAPTERS, engine,
+      NovelViewModel.startBatch(self.novelId, self.chapterIndex, wholeBook ? -1 : BATCH_CHAPTERS, engine,
         (s: NovelBatchState) => {
           if (!self.active) {
             return;
@@ -472,7 +474,7 @@ export struct NovelReaderPage {
             self.refreshToc();
           }
         });
-      self.showToast('已开始翻译后续 ' + BATCH_CHAPTERS + ' 章');
+      self.showToast(wholeBook ? '已开始翻译整本书' : '已开始翻译后续 ' + BATCH_CHAPTERS + ' 章');
     });
   }
 
@@ -739,16 +741,28 @@ export struct NovelReaderPage {
         }
         .width('100%')
       } else {
-        Button('批量翻译后续 ' + BATCH_CHAPTERS + ' 章')
-          .fontSize(ThemeTokens.FONT_SMALL)
-          .fontColor(ThemeTokens.TEXT_SECONDARY)
-          .backgroundColor(ThemeTokens.SURFACE_HIGH)
-          .borderRadius(14)
-          .height(30)
-          .padding({ left: 14, right: 14 })
-          .onClick(() => {
-            this.startBatch();
-          })
+        Row({ space: 8 }) {
+          Button('整本翻译')
+            .fontSize(ThemeTokens.FONT_SMALL)
+            .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
+            .backgroundColor(ThemeTokens.PRIMARY)
+            .borderRadius(14)
+            .height(30)
+            .padding({ left: 14, right: 14 })
+            .onClick(() => {
+              this.startBatch(true);
+            })
+          Button('后续 ' + BATCH_CHAPTERS + ' 章')
+            .fontSize(ThemeTokens.FONT_SMALL)
+            .fontColor(ThemeTokens.TEXT_SECONDARY)
+            .backgroundColor(ThemeTokens.SURFACE_HIGH)
+            .borderRadius(14)
+            .height(30)
+            .padding({ left: 14, right: 14 })
+            .onClick(() => {
+              this.startBatch(false);
+            })
+        }
       }
     }
     .width('100%')

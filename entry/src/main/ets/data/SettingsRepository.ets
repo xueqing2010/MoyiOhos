@@ -42,8 +42,12 @@ export class SettingsKeys {
   static readonly HW_ACCOUNT_UNION_ID: string = 'hw_account_union_id';
   /** 最近一次华为云备份时间（number，毫秒）。 */
   static readonly CLOUD_SYNC_LAST: string = 'cloud_sync_last';
-  /** 最近选择的翻译厂商（string）：'bing'|'openai'|'deepseek'|'qwen'|'doubao'|'zhipu'|'custom'。 */
+  /** 最近选择的翻译厂商（string）：'bing'|'openai'|'deepseek'|'kimi'|'siliconflow'|'qwen'|'doubao'|'hunyuan'|'minimax'|'zhipu'|'custom'。 */
   static readonly API_PROVIDER: string = 'api_provider';
+  /** 阅读时预翻译开关（bool）：打开后阅读器会在后台翻译后续页/章节。 */
+  static readonly PRETRANSLATE_ENABLED: string = 'pretranslate_enabled_v2';
+  /** 预翻译前探页/章数（number，1–10，默认 3）。 */
+  static readonly PRETRANSLATE_AHEAD: string = 'pretranslate_ahead';
   /** OpenAI 兼容 API Key 的 AssetKeyStore alias（string，不是 preferences 键；与 translate-dev 共用）。 */
   static readonly OPENAI_KEY_ALIAS: string = 'openai_api_key';
 

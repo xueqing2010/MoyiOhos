@@ -1026,7 +1026,7 @@ export struct ShelfView {
         this.sheetRow(Artwork.ICON_READER_EXPORT, '导出 ZIP', false, () => {
           this.openExport(this.menuId);
         })
-        this.sheetRow(Artwork.ICON_READER_BATCH, '批量翻译', false, () => {
+        this.sheetRow(Artwork.ICON_READER_BATCH, '整本翻译', false, () => {
           this.batchTranslate(this.menuId);
         })
         this.sheetRow(Artwork.ICON_SHARE, '华为分享', false, () => {

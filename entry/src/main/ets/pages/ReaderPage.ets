@@ -31,6 +31,7 @@ import { ReaderSettingsSheet, cloneReaderSettings } from '../views/ReaderSetting
 import { BatchPanel } from '../views/BatchPanel';
 import { PageTranslateService } from '../service/PageTranslateService';
 import { Motion } from '../common/Motion';
+import { PreTranslateService } from '../service/PreTranslateService';
 import { OcrModelService } from '../service/OcrModelService';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { BatchState } from '../service/BatchTranslateService';
@@ -478,6 +479,10 @@ export struct ReaderPage {
       // 列表首帧后再定位到记忆页（List 尚未测量时 scrollToIndex 无效）
       this.scrollWebtoonTo(this.currentIndex);
     }
+    // 首帧后再启动后台预翻译，避免和页面解码/排版争主线程。
+    setTimeout(() => {
+      PreTranslateService.prefetchManga(this.mangaId, this.currentIndex);
+    }, 800);
   }
 
   /** Webtoon：等 List 完成首帧测量后滚到目标页，并在滚动落定前忽略 onScrollIndex。 */
@@ -830,6 +835,7 @@ export struct ReaderPage {
       this.refreshCurrentTranslation();
     }
     this.persistProgress();
+    PreTranslateService.prefetchManga(this.mangaId, this.currentIndex);
   }
 
   private persistProgress(): void {
@@ -855,12 +861,14 @@ export struct ReaderPage {
       this.webtoonScroller.scrollToIndex(target);
       this.refreshCurrentTranslation();
       this.persistProgress();
+      PreTranslateService.prefetchManga(this.mangaId, this.currentIndex);
       return;
     }
     this.currentIndex = target;
     this.swiperIndex = this.slotIndexOfReal(target);
     this.refreshCurrentTranslation();
     this.persistProgress();
+    PreTranslateService.prefetchManga(this.mangaId, this.currentIndex);
   }
 
   /** 打开菜单时重新读取偏好：确保「我的 → 阅读设置」页的改动在回到阅读器后生效。 */

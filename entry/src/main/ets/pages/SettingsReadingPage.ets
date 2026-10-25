@@ -85,6 +85,7 @@ export struct SettingsReadingPage {
   @State pageMargin: number = 8;
   @State autoInterval: number = 5;
   @State whiteMerge: boolean = true;
+  @State preTranslate: boolean = true;
   @State novelLineHeight: number = 30;
   @State novelMargin: number = 18;
   @State novelDisplayMode: number = 1;
@@ -138,9 +139,16 @@ export struct SettingsReadingPage {
     this.pageMargin = s.margin;
     this.autoInterval = s.autoInterval;
     this.whiteMerge = s.whiteMerge;
+    this.preTranslate = await SettingsRepository.getBool(SettingsKeys.PRETRANSLATE_ENABLED, true);
     this.novelLineHeight = await SettingsRepository.getNumber(SettingsKeys.NOVEL_LINE_HEIGHT, 30);
     this.novelMargin = await SettingsRepository.getNumber(SettingsKeys.NOVEL_MARGIN, 18);
     this.novelDisplayMode = await SettingsRepository.getNumber(SettingsKeys.NOVEL_DISPLAY_MODE, 1);
+  }
+
+  private async togglePreTranslate(v: boolean): Promise<void> {
+    this.preTranslate = v;
+    await SettingsRepository.set(SettingsKeys.PRETRANSLATE_ENABLED, v);
+    this.flash(v ? '预翻译已开启（后续 3 页/章）' : '预翻译已关闭');
   }
 
   private flash(text: string): void {
@@ -539,6 +547,13 @@ export struct SettingsReadingPage {
 
               this.switchRow({ label: '白块合并', desc: '译文与原文区域重叠时合并为一个白块', checked: this.whiteMerge, onChange: (v: boolean) => {
                   this.toggleWhiteMerge(v);
+                } })
+              Divider()
+                .color(ThemeTokens.DIVIDER)
+                .strokeWidth(0.5)
+                .margin({ top: 8, bottom: 2 })
+              this.switchRow({ label: '预翻译后续内容', desc: '阅读时后台翻译后续 3 页/章，翻页更快看到译文', checked: this.preTranslate, onChange: (v: boolean) => {
+                  this.togglePreTranslate(v);
                 } })
             }
 

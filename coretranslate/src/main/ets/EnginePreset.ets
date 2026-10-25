@@ -81,6 +81,26 @@ export class EnginePresets {
     'https://open.bigmodel.cn/api/paas/v4', 'glm-4-flash-250414',
     'https://open.bigmodel.cn/usercenter/apikeys', false);
 
+  static readonly KIMI: EnginePreset = makePreset(
+    'kimi', 'Kimi（月之暗面）', 'moonshot-v1-8k · 长上下文',
+    'https://api.moonshot.cn/v1', 'moonshot-v1-8k',
+    'https://platform.moonshot.cn/console/api-keys', false);
+
+  static readonly SILICONFLOW: EnginePreset = makePreset(
+    'siliconflow', '硅基流动', 'DeepSeek-V3 · 聚合平台',
+    'https://api.siliconflow.cn/v1', 'deepseek-ai/DeepSeek-V3',
+    'https://cloud.siliconflow.cn/account/ak', false);
+
+  static readonly HUNYUAN: EnginePreset = makePreset(
+    'hunyuan', '腾讯混元', 'hunyuan-turbos-latest',
+    'https://api.hunyuan.cloud.tencent.com/v1', 'hunyuan-turbos-latest',
+    'https://console.cloud.tencent.com/hunyuan/api-key', false);
+
+  static readonly MINIMAX: EnginePreset = makePreset(
+    'minimax', 'MiniMax', 'MiniMax-Text-01',
+    'https://api.minimax.chat/v1', 'MiniMax-Text-01',
+    'https://platform.minimaxi.com/user-center/basic-information/interface-key', false);
+
   static readonly OPENAI: EnginePreset = makePreset(
     'openai', 'OpenAI', 'gpt-4o-mini',
     'https://api.openai.com/v1', 'gpt-4o-mini',
@@ -95,8 +115,12 @@ export class EnginePresets {
   static all(): Array<EnginePreset> {
     return [
       EnginePresets.DEEPSEEK,
+      EnginePresets.KIMI,
+      EnginePresets.SILICONFLOW,
       EnginePresets.QWEN,
       EnginePresets.DOUBAO,
+      EnginePresets.HUNYUAN,
+      EnginePresets.MINIMAX,
       EnginePresets.ZHIPU,
       EnginePresets.OPENAI,
       EnginePresets.CUSTOM

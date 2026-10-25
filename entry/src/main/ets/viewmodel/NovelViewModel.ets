@@ -86,19 +86,19 @@ export class NovelBg {
     return ThemeTokens.READER_BG_NOCTURNE;
   }
 
-  /** 文本色：纸色/白色底用深色字，其余用紫夜亮字。 */
+  /** 文本色：纸色/白色底用深色字，其余阅读背景固定用亮字，不能跟随应用主题变深。 */
   static textColor(key: string): string {
     if (key === NovelBg.PAPER || key === NovelBg.WHITE) {
       return '#2B2438';
     }
-    return ThemeTokens.TEXT_PRIMARY;
+    return '#E8F2FF';
   }
 
   static secondaryColor(key: string): string {
     if (key === NovelBg.PAPER || key === NovelBg.WHITE) {
       return '#6B6280';
     }
-    return ThemeTokens.TEXT_HINT;
+    return '#A9C2DD';
   }
 
   static label(key: string): string {
@@ -333,7 +333,7 @@ export class NovelViewModel {
       if (total < 0) {
         total = 0;
       }
-      if (total > count) {
+      if (count >= 0 && total > count) {
         total = count;
       }
       state.chaptersTotal = total;

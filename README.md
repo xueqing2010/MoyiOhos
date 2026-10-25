@@ -6,7 +6,8 @@
 
 - **漫画翻译**：Core Vision Kit 文字识别 → 版面分析 → 译文覆盖层渲染，支持阅读态与对照态
 - **小说阅读**：TXT / EPUB / ZIP-HTML 解析、章节切分、分页器、阅读进度保存
-- **翻译引擎**：统一 `Translator` 抽象，内置必应、OpenAI 兼容接口、本地 llama.cpp 三种实现
+- **翻译引擎**：统一 `Translator` 抽象，内置必应、OpenAI 兼容接口、本地 llama.cpp 三种实现；服务商预设含 DeepSeek、Kimi、硅基流动、通义千问、豆包、腾讯混元、MiniMax、智谱、OpenAI、自定义端点
+- **预翻译/整本翻译**：阅读时后台预翻译后续页/章（默认开启，可在阅读设置关闭）；漫画书架「整本翻译」、小说菜单「整本翻译」可一次翻译整本
 - **本地推理**：内置 llama.cpp（`entry/src/main/cpp/llama.cpp`），支持加载 GGUF 模型离线翻译
 - **OCR 本地模型**：设置→OCR 可下载上游 PP-OCRv6 det/rec 模型（约 9 MB / 19 MB，不随安装包分发），下载后切换到本地档位，由 ONNX Runtime 鸿蒙 NAPI 在本机推理；也可继续使用系统 Core Vision Kit
 - **渲染健壮性**：译文白块按页面像素边界裁剪，并限制在页面图像画布内，避免越界/错位
