@@ -73,7 +73,7 @@ export class PageTranslateService {
   static async prewarm(): Promise<void> {
     await AppEnv.ready();
     await PageTranslateService.configureOcr();
-    await OcrService.getInstance().prewarmLocal();
+    // 本地 OCR 的 ONNX 会话在 TaskPool worker 内创建；主线程不再重复加载一份。
     Log.info(TAG, 'OCR prewarm done, local=' + OcrService.getInstance().isLocalEnabled());
   }
 
@@ -109,8 +109,9 @@ export class PageTranslateService {
       }
       PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 15, 0, 0, '识别文字');
       const tOcr = Date.now();
-      const regions: Array<OcrRegion> = await OcrService.getInstance()
-        .recognize(localOcr ? undefined : pixelMap, lang, page.imagePath);
+      const regions: Array<OcrRegion> = localOcr
+        ? await OcrService.getInstance().recognizeLocalAsync(page.imagePath)
+        : await OcrService.getInstance().recognize(pixelMap, lang, page.imagePath);
       const ocrMs = Date.now() - tOcr;
       PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, 35, 0, regions.length,
         '识别完成 ' + regions.length + ' 行');
@@ -123,47 +124,114 @@ export class PageTranslateService {
       let failed = 0;
       let firstError = '';
       let completed = 0;
-      // 页内行级并发：网络引擎 6 路，本地 llama 串行（避免 NAPI 重入）。
-      const concurrency = engineType === EngineType.LOCAL_LLAMA
-        ? 1 : Math.max(4, Math.min(6, regions.length));
-      let cursor = 0;
       const tTrans = Date.now();
-      const worker = async (): Promise<void> => {
-        while (cursor < regions.length) {
-          const idx = cursor++;
-          const region = regions[idx];
-          try {
-            const req: TranslateRequest = { text: region.text, from: 'auto', to: 'zh' };
-            const key = engineType + '|zh|' + region.text;
-            const cached = PageTranslateService.lineCache.get(key);
-            if (cached !== undefined) {
-              translations[idx] = cached;
-            } else {
-              const translated = await translator.translate(req);
-              translations[idx] = translated;
-              if (PageTranslateService.lineCache.size >= PageTranslateService.LINE_CACHE_MAX) {
-                PageTranslateService.lineCache.clear();
+      const translateLine = async (idx: number): Promise<void> => {
+        const region = regions[idx];
+        const req: TranslateRequest = { text: region.text, from: 'auto', to: 'zh' };
+        const key = engineType + '|zh|' + region.text;
+        const cached = PageTranslateService.lineCache.get(key);
+        if (cached !== undefined) {
+          translations[idx] = cached;
+          return;
+        }
+        const translated = await translator.translate(req);
+        translations[idx] = translated;
+        if (PageTranslateService.lineCache.size >= PageTranslateService.LINE_CACHE_MAX) {
+          PageTranslateService.lineCache.clear();
+        }
+        PageTranslateService.lineCache.set(key, translated);
+      };
+      const markProgress = (n: number): void => {
+        completed = Math.min(regions.length, completed + n);
+        const pct = regions.length === 0 ? 95
+          : 35 + Math.round(60 * completed / regions.length);
+        PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, pct,
+          completed, regions.length, '翻译 ' + completed + '/' + regions.length + ' 行');
+      };
+
+      if (engineType === EngineType.LOCAL_LLAMA && regions.length > 1) {
+        // 本地 llama 串行成本高：把 3–4 行合成一个 prompt，一次生成，按换行拆回。
+        const groups: Array<Array<number>> = [];
+        let current: Array<number> = [];
+        let chars = 0;
+        for (let i = 0; i < regions.length; i++) {
+          const len = regions[i].text.length;
+          if (current.length >= 4 || (chars + len > 600 && current.length > 0)) {
+            groups.push(current);
+            current = [];
+            chars = 0;
+          }
+          current.push(i);
+          chars += len + 1;
+        }
+        if (current.length > 0) {
+          groups.push(current);
+        }
+        for (const group of groups) {
+          let assigned = false;
+          if (group.length > 1) {
+            const text = group.map((idx: number): string => regions[idx].text).join('\n');
+            const key = 'batch|' + engineType + '|zh|' + text;
+            try {
+              let joined = PageTranslateService.lineCache.get(key);
+              if (joined === undefined) {
+                joined = await translator.translate({ text: text, from: 'auto', to: 'zh' });
+                if (PageTranslateService.lineCache.size >= PageTranslateService.LINE_CACHE_MAX) {
+                  PageTranslateService.lineCache.clear();
+                }
+                PageTranslateService.lineCache.set(key, joined);
               }
-              PageTranslateService.lineCache.set(key, translated);
-            }
-          } catch (e) {
-            failed++;
-            if (firstError.length === 0) {
-              firstError = PageTranslateService.readableError(e);
+              const lines = joined.split('\n').map((s: string): string => s.trim())
+                .filter((s: string): boolean => s.length > 0);
+              if (lines.length === group.length) {
+                for (let k = 0; k < group.length; k++) {
+                  translations[group[k]] = lines[k];
+                }
+                assigned = true;
+              }
+            } catch (e) {
+              Log.warn(TAG, 'batch translate failed, fallback per-line: ' + e);
             }
           }
-          completed++;
-          const pct = regions.length === 0 ? 95
-            : 35 + Math.round(60 * completed / regions.length);
-          PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, pct,
-            completed, regions.length, '翻译 ' + completed + '/' + regions.length + ' 行');
+          if (!assigned) {
+            for (const idx of group) {
+              try {
+                await translateLine(idx);
+              } catch (e) {
+                failed++;
+                if (firstError.length === 0) {
+                  firstError = PageTranslateService.readableError(e);
+                }
+              }
+            }
+          }
+          markProgress(group.length);
         }
-      };
-      const workers: Array<Promise<void>> = [];
-      for (let i = 0; i < concurrency; i++) {
-        workers.push(worker());
+      } else {
+        // 网络引擎 6 路并发；单行引擎或只有一行时走逐行。
+        const concurrency = Math.max(1, Math.min(engineType === EngineType.LOCAL_LLAMA ? 1 : 6,
+          regions.length));
+        let cursor = 0;
+        const worker = async (): Promise<void> => {
+          while (cursor < regions.length) {
+            const idx = cursor++;
+            try {
+              await translateLine(idx);
+            } catch (e) {
+              failed++;
+              if (firstError.length === 0) {
+                firstError = PageTranslateService.readableError(e);
+              }
+            }
+            markProgress(1);
+          }
+        };
+        const workers: Array<Promise<void>> = [];
+        for (let i = 0; i < concurrency; i++) {
+          workers.push(worker());
+        }
+        await Promise.all(workers);
       }
-      await Promise.all(workers);
       Log.info(TAG, 'page ' + pageId + ' timings: ocr=' + ocrMs + 'ms, translate='
         + (Date.now() - tTrans) + 'ms, total=' + (Date.now() - tStart) + 'ms');
 

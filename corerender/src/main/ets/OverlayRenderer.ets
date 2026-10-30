@@ -113,8 +113,10 @@ export class OverlayRenderer {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const box = item.box;
-      ctx.fillStyle = colors.boxFill;
-      ctx.fillRect(dx + box.x * scale, dy + box.y * scale, box.w * scale, box.h * scale);
+      if (colors.boxFill !== 'none') {
+        ctx.fillStyle = colors.boxFill;
+        ctx.fillRect(dx + box.x * scale, dy + box.y * scale, box.w * scale, box.h * scale);
+      }
       ctx.fillStyle = colors.textColor;
       let lastFs = -1;
       const runs = item.layout.runs;

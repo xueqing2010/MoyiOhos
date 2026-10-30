@@ -34,6 +34,7 @@ import { PageTranslateService, TranslatePhase, TranslateProgress } from '../serv
 import { Motion } from '../common/Motion';
 import { PreTranslateService } from '../service/PreTranslateService';
 import { OcrModelService } from '../service/OcrModelService';
+import { PageImageCleaner } from '../service/PageImageCleaner';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { BatchState } from '../service/BatchTranslateService';
 import { ExportMode, ExportResult } from '../service/ExportService';
@@ -120,6 +121,7 @@ struct ReaderPageLayer {
   @State areaW: number = 0;
   @State areaH: number = 0;
   @State imageFailed: boolean = false;
+  @State cleanedPath: string = '';
   private ctx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
   private pageSize: PageSize = new PageSize();
   private translation: PageTranslation | undefined = undefined;
@@ -154,6 +156,11 @@ struct ReaderPageLayer {
       this.loadTranslation(false);
       return;
     }
+    if (this.mode === ReaderMode.RAW) {
+      this.cleanedPath = '';
+    } else {
+      this.prepareClean();
+    }
     this.draw();
   }
 
@@ -178,7 +185,23 @@ struct ReaderPageLayer {
     const pt = await ReaderViewModel.getTranslation(this.page.id);
     this.translation = pt;
     this.transLoaded = true;
+    this.cleanedPath = '';
+    this.prepareClean();
     this.draw();
+  }
+
+  /** 生成/复用去字底图；没有 repaired 图时继续用白块覆盖。 */
+  private async prepareClean(): Promise<void> {
+    const pt = this.translation;
+    if (this.mode === ReaderMode.RAW || pt === undefined || pt.ocr.length === 0) {
+      this.cleanedPath = '';
+      return;
+    }
+    const path = await PageImageCleaner.ensure(this.page.id, this.page.imagePath, pt.ocr);
+    if (path !== undefined && path.length > 0) {
+      this.cleanedPath = path;
+      this.draw();
+    }
   }
 
   private lineSpacingExtra(): number {
@@ -272,9 +295,10 @@ struct ReaderPageLayer {
       this.planKey = key;
     }
     const items = this.planItems;
+    const boxFill = this.cleanedPath.length > 0 ? 'none' : (this.filterInvert ? '#15121F' : '#FFFFFF');
     const colors = this.filterInvert
-      ? OverlayColors.make('#15121F', '#E8E4F5')
-      : OverlayColors.make('#FFFFFF', '#1A1A1A');
+      ? OverlayColors.make(boxFill, '#E8E4F5')
+      : OverlayColors.make(boxFill, '#1A1A1A');
     // 画布可能覆盖整页容器（含留白），把覆盖层裁剪到页面图像矩形内，
     // 避免任何越界 OCR 框把白块画到页外（页面渲染错位）。
     ctx.save();
@@ -287,7 +311,8 @@ struct ReaderPageLayer {
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Image(toMediaUri(this.page.imagePath))
+      Image(toMediaUri(this.mode !== ReaderMode.RAW && this.cleanedPath.length > 0
+        ? this.cleanedPath : this.page.imagePath))
         .width('100%')
         .height('100%')
         .objectFit(ImageFit.Contain)
