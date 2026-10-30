@@ -16,15 +16,16 @@ export struct ImportView {
         .fontWeight(FontWeight.Bold)
         .fontColor(ThemeTokens.TEXT_PRIMARY)
         .width('100%')
-        .margin({ top: 12, bottom: 16 })
+        .margin({ top: 4, bottom: 10 })
       Scroll() {
         Column({ space: 16 }) {
-          ImportSheet()
+          ImportSheet({ compactTop: true })
           NovelImportPanel()
         }
         .width('100%')
       }
       .scrollBar(BarState.Off)
+      .align(Alignment.TopStart)
       .layoutWeight(1)
       .width('100%')
     }

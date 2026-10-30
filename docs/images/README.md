@@ -9,6 +9,5 @@
 | reader-original.jpg | 漫画原文（日文） |
 | model-manager.jpg | 模型管理：OCR 模型已下载、GGUF 暂停、存储占用 |
 | history.jpg | 翻译历史列表 |
-| huawei-account-login.jpg | 真机华为账号已登录，显示云备份/云恢复入口 |
 
 截图环境：HarmonyOS 7.0.0 / API 26，Mate 90 Pro / MatePad Pro 13 模拟器与 PCE-W30 真机。

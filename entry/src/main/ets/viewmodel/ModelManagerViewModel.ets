@@ -292,16 +292,28 @@ export class ModelManagerViewModel {
 
   /** Register an imported local GGUF (no copy; path referenced in place). */
   static async importGguf(uri: string): Promise<void> {
-    if (!uri.toLowerCase().endsWith('.gguf')) {
+    const fileName = ModelManagerViewModel.fileNameOf(uri);
+    if (!fileName.toLowerCase().endsWith('.gguf')) {
       throw new Error('请选择 .gguf 模型文件');
     }
-    const fileName = ModelManagerViewModel.fileNameOf(uri);
+    // NAPI llama.cpp 只能读取沙箱文件；content:// URI 必须先复制到 models 目录。
+    DownloadService.ensureModelsDir();
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const destPath = `${DownloadService.modelsDir()}/imported_${Date.now()}_${safeName}`;
+    const src = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+    try {
+      await fs.copyFile(src.fd, destPath);
+    } finally {
+      fs.closeSync(src);
+    }
     const key = `IMPORT_${Date.now()}`;
     const task = makeDownloadTask(key, fileName, '', fileName);
     task.status = DownloadStatus.DOWNLOADED;
-    task.localPath = uri;
+    task.localPath = destPath;
+    task.totalBytes = fs.statSync(destPath).size;
+    task.downloadedBytes = task.totalBytes;
     await DownloadRepository.upsert(task);
-    AppEnv.getInstance().updateLocalModelPath(uri);
+    AppEnv.getInstance().updateLocalModelPath(destPath);
   }
 
   static fileNameOf(url: string): string {

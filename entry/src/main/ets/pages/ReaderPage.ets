@@ -13,6 +13,7 @@ import {
 } from 'corerender';
 import { MangaPage, PageTranslation } from 'coremodel';
 import { EngineType } from 'coretranslate';
+import { uiMaterial } from '@kit.ArkUI';
 import { OcrService } from 'coreocr';
 import { ThemeTokens, Log, WindowSizeClass, observeBreakpoint, toMediaUri } from 'commons';
 import { AppEnv } from '../common/AppEnv';
@@ -29,7 +30,7 @@ import {
 import { ReaderMenuView } from '../views/ReaderMenuView';
 import { ReaderSettingsSheet, cloneReaderSettings } from '../views/ReaderSettingsSheet';
 import { BatchPanel } from '../views/BatchPanel';
-import { PageTranslateService } from '../service/PageTranslateService';
+import { PageTranslateService, TranslatePhase, TranslateProgress } from '../service/PageTranslateService';
 import { Motion } from '../common/Motion';
 import { PreTranslateService } from '../service/PreTranslateService';
 import { OcrModelService } from '../service/OcrModelService';
@@ -374,6 +375,11 @@ export struct ReaderPage {
   @State pageSizes: Array<PageSize> = [];
   @State webtoonHeights: Array<number> = [];
   @State translating: boolean = false;
+  @State translatePhase: TranslatePhase = TranslatePhase.OCR;
+  @State translatePct: number = 0;
+  @State translateDone: number = 0;
+  @State translateTotal: number = 0;
+  @State translateDetail: string = '';
   @State ocrAvailable: boolean = true;
   @State autoTurning: boolean = false;
   @State batchRunning: boolean = false;
@@ -381,6 +387,7 @@ export struct ReaderPage {
   @State batchDone: number = 0;
   @State batchFailed: number = 0;
   @State batchCurrent: number = 0;
+  @State batchPhaseDetail: string = '';
   @State batchError: string = '';
   @State batchFailedIds: Array<number> = [];
   @State exportBusy: boolean = false;
@@ -1026,9 +1033,23 @@ export struct ReaderPage {
       return;
     }
     this.translating = true;
+    this.menuVisible = false;
+    this.settingsVisible = false;
+    this.translatePhase = TranslatePhase.OCR;
+    this.translatePct = 0;
+    this.translateDone = 0;
+    this.translateTotal = 0;
+    this.translateDetail = '准备 OCR';
     try {
       const engine: EngineType = await PageTranslateService.loadEngineType();
-      const pt = await PageTranslateService.translatePage(page.id, engine);
+      const onProgress = (p: TranslateProgress): void => {
+        this.translatePhase = p.phase;
+        this.translatePct = p.percent;
+        this.translateDone = p.done;
+        this.translateTotal = p.total;
+        this.translateDetail = p.detail;
+      };
+      const pt = await PageTranslateService.translatePage(page.id, engine, onProgress);
       ReaderViewModel.putTranslation(pt);
       this.currentTranslated = pt.ocr.length > 0 && pt.translations.length > 0;
       this.transRev++;
@@ -1053,6 +1074,7 @@ export struct ReaderPage {
     this.batchDone = s.done;
     this.batchFailed = s.failed;
     this.batchCurrent = s.currentPage;
+    this.batchPhaseDetail = s.currentDetail;
     this.batchError = s.lastError;
     this.batchFailedIds = s.failedPageIds.slice();
     if (s.done !== this.lastBatchDone) {
@@ -1322,6 +1344,55 @@ export struct ReaderPage {
     }
   }
 
+  private translatePhaseLabel(): string {
+    if (this.translatePhase === TranslatePhase.OCR) {
+      return 'OCR 识别阶段';
+    }
+    if (this.translatePhase === TranslatePhase.TRANSLATE) {
+      return '翻译阶段';
+    }
+    return '保存译文';
+  }
+
+  @Builder
+  translateProgressOverlay() {
+    Column({ space: 10 }) {
+      Row({ space: 8 }) {
+        Text(this.translatePhaseLabel())
+          .fontSize(ThemeTokens.FONT_SMALL)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(ThemeTokens.TEXT_PRIMARY)
+          .layoutWeight(1)
+        Text(this.translatePct + '%')
+          .fontSize(ThemeTokens.FONT_SMALL)
+          .fontColor(ThemeTokens.PRIMARY)
+      }
+      .width('100%')
+      Progress({ value: this.translatePct, total: 100, type: ProgressType.Linear })
+        .width('100%')
+        .height(4)
+        .color(ThemeTokens.PRIMARY)
+        .backgroundColor(ThemeTokens.SURFACE_VARIANT)
+      Text(this.translateDetail)
+        .fontSize(ThemeTokens.FONT_SMALL)
+        .fontColor(ThemeTokens.TEXT_SECONDARY)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+    }
+    .width('78%')
+    .padding(16)
+    .borderRadius(ThemeTokens.RADIUS_CARD)
+    .backgroundColor(ThemeTokens.SURFACE)
+    .systemMaterial(new uiMaterial.ImmersiveMaterial({
+      style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+      interactive: false,
+      lightEffect: {}
+    }))
+    .border({ width: 1, color: ThemeTokens.SURFACE_VARIANT })
+    .shadow({ radius: 18, color: '#26000000', offsetY: 6 })
+  }
+
   @Builder
   progressPill() {
     Column({ space: 3 }) {
@@ -1404,6 +1475,7 @@ export struct ReaderPage {
             done: this.batchDone,
             failed: this.batchFailed,
             currentPage: this.batchCurrent,
+            phaseDetail: this.batchPhaseDetail,
             lastError: this.batchError,
             failedPageIds: this.batchFailedIds,
             onCancel: () => {
@@ -1665,6 +1737,17 @@ export struct ReaderPage {
             && !this.menuVisible && !this.settingsVisible) {
             Column() {
               this.transHint()
+            }
+            .width('100%')
+            .height('100%')
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .hitTestBehavior(HitTestMode.Transparent)
+          }
+
+          if (this.translating) {
+            Column() {
+              this.translateProgressOverlay()
             }
             .width('100%')
             .height('100%')

@@ -1,12 +1,7 @@
 import { ThemeTokens, WindowSizeClass, observeBreakpoint } from 'commons';
-import { common } from '@kit.AbilityKit';
-import { BusinessError } from '@kit.BasicServicesKit';
-import { LoginWithHuaweiIDButton, loginComponentManager } from '@kit.AccountKit';
 import { AppEnv } from '../common/AppEnv';
 import { Routes } from '../common/Routes';
 import { BuildInfo } from '../common/BuildInfo';
-import { AccountService } from '../service/AccountService';
-import { CloudBackupInfo, CloudSyncService } from '../service/CloudSyncService';
 
 /** 我的页入口行（图标 + 标题 + 说明 + 目标路由）。 */
 interface MeEntry {
@@ -42,26 +37,12 @@ function makeGroup(title: string, icon: Resource, rows: Array<MeEntry>): MeGroup
 @Component
 export struct MeView {
   @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
-  @State loggedIn: boolean = false;
-  @State accountMask: string = '';
-  @State accountHint: string = '';
-  @State accountBusy: boolean = false;
-  @State huaweiLoginAvailable: boolean = false;
   private navStack: NavPathStack = AppEnv.getInstance().navStack;
   private stopBreakpoint: (() => void) | undefined = undefined;
   private groups: Array<MeGroup> = [];
-  private loginController: loginComponentManager.LoginWithHuaweiIDButtonController =
-    new loginComponentManager.LoginWithHuaweiIDButtonController();
-  private loginParams: loginComponentManager.LoginWithHuaweiIDButtonParams = {
-    style: loginComponentManager.Style.BUTTON_WHITE_OUTLINE,
-    loginType: loginComponentManager.LoginType.ID,
-    borderRadius: 22,
-    textAndIconStyle: true
-  };
 
   aboutToAppear(): void {
     this.groups = MeView.buildGroups();
-    this.initAccount();
     this.stopBreakpoint = observeBreakpoint((c: WindowSizeClass) => {
       this.sizeClass = c;
     });
@@ -72,166 +53,6 @@ export struct MeView {
       this.stopBreakpoint();
       this.stopBreakpoint = undefined;
     }
-  }
-
-  private async initAccount(): Promise<void> {
-    try {
-      this.huaweiLoginAvailable = canIUse('SystemCapability.AuthenticationServices.HuaweiID.UIComponent');
-    } catch (e) {
-      this.huaweiLoginAvailable = false;
-    }
-    if (this.huaweiLoginAvailable) {
-      try {
-        this.loginController.onClickLoginWithHuaweiIDButton(
-          (err: BusinessError, cred: loginComponentManager.HuaweiIDCredential) => {
-            if (err) {
-              this.accountHint = MeView.loginError(err);
-              return;
-            }
-            AccountService.saveLogin(cred.openID, cred.unionID).then(() => {
-              this.loggedIn = true;
-              this.accountMask = AccountService.maskOpenId(cred.openID);
-              this.accountHint = '已登录华为账号';
-            }).catch((e: Error) => {
-              this.accountHint = '保存登录态失败：' + e.message;
-            });
-          });
-      } catch (e) {
-        this.huaweiLoginAvailable = false;
-      }
-    }
-    this.refreshAccount();
-  }
-
-  private static loginError(err: BusinessError): string {
-    const msg = err.message !== undefined ? err.message : '';
-    if (msg.indexOf('clientId') >= 0 || msg.indexOf('profile') >= 0) {
-      return '华为账号登录未配置：当前安装包签名未在 AGC 绑定应用，需正式签名并配置 clientId 后重试。';
-    }
-    if (msg.length > 0) {
-      return '登录未完成：' + msg;
-    }
-    return '登录未完成，请稍后重试';
-  }
-
-  private async refreshAccount(): Promise<void> {
-    this.loggedIn = await AccountService.isLoggedIn();
-    const openId = await AccountService.openId();
-    this.accountMask = this.loggedIn ? AccountService.maskOpenId(openId) : '';
-  }
-
-  private async backupToCloud(): Promise<void> {
-    this.accountBusy = true;
-    this.accountHint = '正在上传备份…';
-    try {
-      const ctx = getContext(this) as common.UIAbilityContext;
-      const info: CloudBackupInfo = await CloudSyncService.backup(ctx);
-      this.accountHint = '已备份 ' + info.mangas + ' 部漫画 / ' + info.novels + ' 部小说到华为云';
-    } catch (e) {
-      this.accountHint = e instanceof Error ? e.message : String(e);
-    }
-    this.accountBusy = false;
-  }
-
-  private async restoreFromCloud(): Promise<void> {
-    this.accountBusy = true;
-    this.accountHint = '正在读取云端备份…';
-    try {
-      const ctx = getContext(this) as common.UIAbilityContext;
-      this.accountHint = await CloudSyncService.restore(ctx);
-    } catch (e) {
-      this.accountHint = e instanceof Error ? e.message : String(e);
-    }
-    this.accountBusy = false;
-  }
-
-  private async logoutAccount(): Promise<void> {
-    await AccountService.logout();
-    this.loggedIn = false;
-    this.accountMask = '';
-    this.accountHint = '已退出华为账号（本地数据保留）';
-  }
-
-  @Builder
-  accountCard() {
-    Column({ space: 10 }) {
-      Row({ space: 8 }) {
-        Image($r('app.media.ic_share'))
-          .width(18)
-          .height(18)
-          .fillColor(ThemeTokens.PRIMARY)
-        Text('华为账号与云同步')
-          .fontSize(ThemeTokens.FONT_CAPTION)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(ThemeTokens.TEXT_SECONDARY)
-          .layoutWeight(1)
-        if (this.loggedIn) {
-          Text(this.accountMask)
-            .fontSize(10)
-            .fontColor(ThemeTokens.TEXT_HINT)
-        }
-      }
-      .width('100%')
-
-      if (!this.loggedIn) {
-        if (this.huaweiLoginAvailable) {
-          LoginWithHuaweiIDButton({ params: this.loginParams, controller: this.loginController })
-            .width('100%')
-            .height(42)
-        } else {
-          Text('当前设备未提供华为账号登录组件；请在真机/支持 HMS Core 的设备登录。')
-            .fontSize(ThemeTokens.FONT_SMALL)
-            .fontColor(ThemeTokens.TEXT_HINT)
-            .width('100%')
-        }
-      } else {
-        Row({ space: 10 }) {
-          Button('备份到华为云')
-            .fontSize(ThemeTokens.FONT_SMALL)
-            .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
-            .backgroundColor(ThemeTokens.PRIMARY)
-            .borderRadius(ThemeTokens.RADIUS_PILL)
-            .height(34)
-            .layoutWeight(1)
-            .enabled(!this.accountBusy)
-            .onClick(() => {
-              this.backupToCloud();
-            })
-          Button('从云端恢复')
-            .fontSize(ThemeTokens.FONT_SMALL)
-            .fontColor(ThemeTokens.PRIMARY)
-            .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-            .borderRadius(ThemeTokens.RADIUS_PILL)
-            .height(34)
-            .layoutWeight(1)
-            .enabled(!this.accountBusy)
-            .onClick(() => {
-              this.restoreFromCloud();
-            })
-        }
-        .width('100%')
-        Button('退出账号')
-          .fontSize(ThemeTokens.FONT_SMALL)
-          .fontColor(ThemeTokens.TEXT_HINT)
-          .backgroundColor(Color.Transparent)
-          .height(26)
-          .onClick(() => {
-            this.logoutAccount();
-          })
-      }
-
-      Text(this.accountHint.length > 0 ? this.accountHint
-        : '云同步保存书架索引、阅读进度与偏好；需 AGC 开通云存储实例并使用匹配的签名 Profile。')
-        .fontSize(ThemeTokens.FONT_SMALL)
-        .fontColor(ThemeTokens.TEXT_HINT)
-        .width('100%')
-        .maxLines(3)
-    }
-    .width('100%')
-    .padding(ThemeTokens.CARD_PADDING)
-    .borderRadius(ThemeTokens.RADIUS_CARD)
-    .backgroundColor(ThemeTokens.CARD_BG)
-    .alignItems(HorizontalAlign.Start)
   }
 
   private static buildGroups(): Array<MeGroup> {
@@ -406,7 +227,6 @@ export struct MeView {
       Scroll() {
         Column({ space: 12 }) {
           this.brandHeader()
-          this.accountCard()
 
           if (this.isWide()) {
             Row({ space: 12 }) {

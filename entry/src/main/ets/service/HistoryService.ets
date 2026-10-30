@@ -46,6 +46,8 @@ export class HistoryItem {
   /** 全屏阅读用全文（小说章节原文/译文、文本翻译原文/译文）。 */
   contentOriginal: string = '';
   contentTranslated: string = '';
+  /** 单本合并后的摘要行（列表只显示一行，点开看全书）。 */
+  isSummary: boolean = false;
 }
 
 /** 一个分组（时间视图 = 同一天；进程视图 = 同一 manga/novel/文本日会话）。 */
@@ -143,8 +145,23 @@ export class HistoryService {
       snapshot.textCount++;
     }
     snapshot.items.sort((a: HistoryItem, b: HistoryItem) => b.time - a.time);
-    snapshot.timeGroups = HistoryService.groupByTime(snapshot.items);
+    // 历史按「单本」合并：同一本书只出现一行，时间取最近一次翻译，
+    // 计数取该书累计已译页/章，而不是每翻译一次就新增一条。
+    snapshot.timeGroups = HistoryService.groupByProcess(snapshot.items);
     snapshot.processGroups = HistoryService.groupByProcess(snapshot.items);
+    // 顶部统计也按单本计算（同一本书只算 1），与列表合并口径一致。
+    snapshot.mangaCount = 0;
+    snapshot.novelCount = 0;
+    snapshot.textCount = 0;
+    for (const group of snapshot.processGroups) {
+      if (group.kind === HistoryKind.MANGA_PAGE) {
+        snapshot.mangaCount++;
+      } else if (group.kind === HistoryKind.NOVEL_CHAPTER) {
+        snapshot.novelCount++;
+      } else {
+        snapshot.textCount++;
+      }
+    }
     return snapshot;
   }
 

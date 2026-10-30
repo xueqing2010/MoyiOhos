@@ -25,8 +25,28 @@ const KEY_ENGINE = 'text_engine';
  * 异步链（image.createImageSource 为异步 API，不阻塞帧）；OCR 与引擎调用
  * 亦运行在 ArkTS 线程。
  */
+export enum TranslatePhase {
+  OCR = 0,
+  TRANSLATE = 1,
+  SAVING = 2
+}
+
+/** 单页翻译的可观察进度（OCR → 逐行翻译 → 落库）。 */
+export class TranslateProgress {
+  phase: TranslatePhase = TranslatePhase.OCR;
+  done: number = 0;
+  total: number = 0;
+  percent: number = 0;
+  detail: string = '';
+}
+
+export type TranslateProgressCallback = (p: TranslateProgress) => void;
+
 export class PageTranslateService {
   private static dictText: string = '';
+  /** 页内行级译文缓存：漫画气泡重复率高，命中可直接跳过网络/模型。 */
+  private static lineCache: Map<string, string> = new Map<string, string>();
+  private static readonly LINE_CACHE_MAX = 600;
 
   private static async configureOcr(): Promise<void> {
     const tier = await SettingsRepository.getString(SettingsKeys.OCR_ENGINE_TIER, 'system');
@@ -49,51 +69,94 @@ export class PageTranslateService {
     service.setLocalEnabled(true);
   }
 
-  static async translatePage(pageId: number, engineType: EngineType): Promise<PageTranslation> {
-    return PageTranslateService.run(pageId, engineType);
+  /** 启动预热：系统 OCR 初始化或本地 OCR 会话加载，失败只记日志。 */
+  static async prewarm(): Promise<void> {
+    await AppEnv.ready();
+    await PageTranslateService.configureOcr();
+    await OcrService.getInstance().prewarmLocal();
+    Log.info(TAG, 'OCR prewarm done, local=' + OcrService.getInstance().isLocalEnabled());
   }
 
-  static async retryPage(pageId: number, engineType: EngineType): Promise<PageTranslation> {
-    return PageTranslateService.run(pageId, engineType);
+  static async translatePage(pageId: number, engineType: EngineType,
+    onProgress?: TranslateProgressCallback): Promise<PageTranslation> {
+    return PageTranslateService.run(pageId, engineType, onProgress);
   }
 
-  private static async run(pageId: number, engineType: EngineType): Promise<PageTranslation> {
+  static async retryPage(pageId: number, engineType: EngineType,
+    onProgress?: TranslateProgressCallback): Promise<PageTranslation> {
+    return PageTranslateService.run(pageId, engineType, onProgress);
+  }
+
+  private static async run(pageId: number, engineType: EngineType,
+    onProgress?: TranslateProgressCallback): Promise<PageTranslation> {
     await AppEnv.ready();
     const page = await PageRepository.getPage(pageId);
     if (page === undefined) {
       throw new Error('页面记录不存在');
     }
     const lang = await PageTranslateService.loadOcrLang();
+    const tStart = Date.now();
     let pixelMap: image.PixelMap | undefined = undefined;
     try {
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 2, 0, 0, '准备 OCR');
       await PageTranslateService.configureOcr();
-      pixelMap = await PageTranslateService.decode(page.imagePath);
-      const regions: Array<OcrRegion> = await OcrService.getInstance().recognize(pixelMap, lang, page.imagePath);
-      const translator: Translator = AppEnv.getInstance().engineRegistry.get(engineType);
 
+      // 本地 OCR 直接读文件；系统 OCR 才需要先解码 PixelMap。
+      const localOcr = OcrService.getInstance().isLocalEnabled();
+      if (!localOcr) {
+        PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 8, 0, 0, '解码页面');
+        pixelMap = await PageTranslateService.decode(page.imagePath);
+      }
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 15, 0, 0, '识别文字');
+      const tOcr = Date.now();
+      const regions: Array<OcrRegion> = await OcrService.getInstance()
+        .recognize(localOcr ? undefined : pixelMap, lang, page.imagePath);
+      const ocrMs = Date.now() - tOcr;
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, 35, 0, regions.length,
+        '识别完成 ' + regions.length + ' 行');
+
+      const translator: Translator = AppEnv.getInstance().engineRegistry.get(engineType);
       const translations: Array<string> = [];
       for (let i = 0; i < regions.length; i++) {
         translations.push('');
       }
       let failed = 0;
       let firstError = '';
-      // 页内行级并发：网络引擎 4 路并行，本地 llama 保持串行（避免 NAPI 重入）。
-      const concurrency = engineType === EngineType.LOCAL_LLAMA ? 1 : 4;
+      let completed = 0;
+      // 页内行级并发：网络引擎 6 路，本地 llama 串行（避免 NAPI 重入）。
+      const concurrency = engineType === EngineType.LOCAL_LLAMA
+        ? 1 : Math.max(4, Math.min(6, regions.length));
       let cursor = 0;
+      const tTrans = Date.now();
       const worker = async (): Promise<void> => {
         while (cursor < regions.length) {
           const idx = cursor++;
           const region = regions[idx];
           try {
             const req: TranslateRequest = { text: region.text, from: 'auto', to: 'zh' };
-            const translated = await translator.translate(req);
-            translations[idx] = translated;
+            const key = engineType + '|zh|' + region.text;
+            const cached = PageTranslateService.lineCache.get(key);
+            if (cached !== undefined) {
+              translations[idx] = cached;
+            } else {
+              const translated = await translator.translate(req);
+              translations[idx] = translated;
+              if (PageTranslateService.lineCache.size >= PageTranslateService.LINE_CACHE_MAX) {
+                PageTranslateService.lineCache.clear();
+              }
+              PageTranslateService.lineCache.set(key, translated);
+            }
           } catch (e) {
             failed++;
             if (firstError.length === 0) {
               firstError = PageTranslateService.readableError(e);
             }
           }
+          completed++;
+          const pct = regions.length === 0 ? 95
+            : 35 + Math.round(60 * completed / regions.length);
+          PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, pct,
+            completed, regions.length, '翻译 ' + completed + '/' + regions.length + ' 行');
         }
       };
       const workers: Array<Promise<void>> = [];
@@ -101,6 +164,8 @@ export class PageTranslateService {
         workers.push(worker());
       }
       await Promise.all(workers);
+      Log.info(TAG, 'page ' + pageId + ' timings: ocr=' + ocrMs + 'ms, translate='
+        + (Date.now() - tTrans) + 'ms, total=' + (Date.now() - tStart) + 'ms');
 
       const pt = makePageTranslation(pageId);
       pt.engineType = engineType as number;
@@ -115,7 +180,11 @@ export class PageTranslateService {
       } else {
         pt.status = TranslateStatus.DONE;
       }
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.SAVING, 98,
+        completed, regions.length, '保存译文');
       await PageRepository.saveTranslation(pt);
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.SAVING, 100,
+        completed, regions.length, '完成');
       Log.info(TAG, `page ${pageId}: ${regions.length} lines, ${failed} failed`);
       return pt;
     } catch (e) {
@@ -240,6 +309,24 @@ export class PageTranslateService {
       await pref.flush();
     } catch (e) {
       // ignore
+    }
+  }
+
+  private static emitProgress(cb: TranslateProgressCallback | undefined, phase: TranslatePhase,
+    percent: number, done: number, total: number, detail: string): void {
+    if (cb === undefined) {
+      return;
+    }
+    const p = new TranslateProgress();
+    p.phase = phase;
+    p.percent = Math.max(0, Math.min(100, percent));
+    p.done = done;
+    p.total = total;
+    p.detail = detail;
+    try {
+      cb(p);
+    } catch (e) {
+      Log.warn(TAG, 'progress callback failed: ' + e);
     }
   }
 

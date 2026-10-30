@@ -231,6 +231,11 @@ struct Index {
       .margin({ top: 4 })
       .borderRadius(ThemeTokens.RADIUS_SMALL)
       .backgroundColor(this.currentTab === index ? ThemeTokens.SURFACE_SECONDARY : Color.Transparent)
+      .systemMaterial(new uiMaterial.ImmersiveMaterial({
+        style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+        interactive: true,
+        lightEffect: {}
+      }))
       .onClick(() => {
         this.currentTab = index;
       })
@@ -280,8 +285,8 @@ struct Index {
     .width(this.sizeClass === WindowSizeClass.LG ? 216 : 88)
     .height('100%')
     .padding({ left: 10, right: 10, top: 14 })
-    .backgroundColor(ThemeTokens.MATERIAL_TINT)
-    .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
+    .backgroundColor(this.immersiveSupported ? Color.Transparent : ThemeTokens.MATERIAL_TINT)
+    .backgroundBlurStyle(this.immersiveSupported ? BlurStyle.NONE : BlurStyle.COMPONENT_THICK)
     .systemMaterial(new uiMaterial.ImmersiveMaterial({
       style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
       interactive: true,
@@ -376,6 +381,11 @@ struct Index {
         : undefined
     })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+    // 点击 Tab 时立即更新选中态：只依赖 onChange 会等 320ms 切换动画，
+    // 旧 Tab 的材质高亮会与新目标同时亮起。
+    .onTabBarClick((index: number) => {
+      this.currentTab = index;
+    })
     .onChange((index: number) => {
       this.currentTab = index;
     })

@@ -103,10 +103,50 @@ export struct HistoryView {
     return this.viewMode === 0 ? this.timeGroups : this.processGroups;
   }
 
+  /** 合并行：一本书一行，卡片显示累计页/章与最近时间。 */
+  private summaryItem(group: HistoryGroup): HistoryItem {
+    const item = new HistoryItem();
+    item.isSummary = true;
+    item.key = group.key + ':summary';
+    item.groupKey = group.key;
+    item.kind = group.kind;
+    item.title = group.title;
+    item.subtitle = group.subtitle;
+    item.coverPath = group.coverPath;
+    item.time = group.latestTime;
+    item.pageCount = group.pageCount;
+    item.translatedCount = group.translatedCount;
+    if (group.items.length > 0) {
+      const latest = group.items[0];
+      item.refId = latest.refId;
+      item.status = latest.status;
+      item.engineType = latest.engineType;
+      item.preview = latest.preview;
+    }
+    return item;
+  }
+
+  private findGroup(key: string): HistoryGroup | undefined {
+    for (const group of this.currentGroups()) {
+      if (group.key === key) {
+        return group;
+      }
+    }
+    return undefined;
+  }
+
   private buildRows(groups: Array<HistoryGroup>): Array<HistoryRenderRow> {
     const rows: Array<HistoryRenderRow> = [];
     const perRow = this.isWide ? 2 : 1;
     for (const group of groups) {
+      if (!this.manageMode) {
+        const summary = new HistoryRenderRow();
+        summary.isHeader = false;
+        summary.group = group;
+        summary.items = [this.summaryItem(group)];
+        rows.push(summary);
+        continue;
+      }
       const header = new HistoryRenderRow();
       header.isHeader = true;
       header.group = group;
@@ -165,13 +205,24 @@ export struct HistoryView {
   private enterManage(item?: HistoryItem): void {
     this.manageMode = true;
     if (item !== undefined) {
-      this.selectedKeys = [item.key];
+      const group = this.findGroup(item.groupKey);
+      if (item.isSummary && group !== undefined) {
+        const keys: Array<string> = [];
+        for (const it of group.items) {
+          keys.push(it.key);
+        }
+        this.selectedKeys = keys;
+      } else {
+        this.selectedKeys = [item.key];
+      }
     }
+    this.refreshRows();
   }
 
   private exitManage(): void {
     this.manageMode = false;
     this.selectedKeys = [];
+    this.refreshRows();
   }
 
   private isSelected(key: string): boolean {
@@ -195,6 +246,13 @@ export struct HistoryView {
   private onItemTap(item: HistoryItem): void {
     if (this.manageMode) {
       this.toggleSelect(item);
+      return;
+    }
+    if (item.isSummary) {
+      const group = this.findGroup(item.groupKey);
+      if (group !== undefined) {
+        this.openFullscreen(group);
+      }
       return;
     }
     AppEnv.getInstance().navStack.pushPathByName(Routes.HISTORY_DETAIL,
@@ -431,7 +489,7 @@ export struct HistoryView {
             .fontWeight(FontWeight.Bold)
             .fontColor(ThemeTokens.TEXT_PRIMARY)
           Text(this.items.length === 0 ? '漫画 · 小说 · 文本 翻译记录'
-            : this.items.length + ' 条 · 漫画 ' + this.mangaCount + ' / 小说 ' + this.novelCount +
+            : this.processGroups.length + ' 本 · 漫画 ' + this.mangaCount + ' / 小说 ' + this.novelCount +
               ' / 文本 ' + this.textCount)
             .fontSize(ThemeTokens.FONT_SMALL)
             .fontColor(ThemeTokens.TEXT_HINT)
@@ -466,8 +524,8 @@ export struct HistoryView {
       .width('100%')
 
       Row() {
-        this.segment('时间', 0)
-        this.segment('进程', 1)
+        this.segment('最近', 0)
+        this.segment('按书', 1)
       }
       .width('100%')
       .padding(4)

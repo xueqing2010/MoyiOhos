@@ -34,14 +34,6 @@ export class SettingsKeys {
   static readonly THEME_MODE: string = 'theme_mode';
   /** OCR 引擎档位（string）：'system' 系统 Core Vision Kit（默认）| 'local' 本地 ONNX 模型（需下载模型）。 */
   static readonly OCR_ENGINE_TIER: string = 'ocr_engine_tier';
-  /** 华为账号是否已登录（bool，仅本地会话标记；凭证不落盘）。 */
-  static readonly HW_ACCOUNT_LOGGED_IN: string = 'hw_account_logged_in';
-  /** 华为账号 OpenID（string，用于展示脱敏 ID 与云同步归属校验）。 */
-  static readonly HW_ACCOUNT_OPEN_ID: string = 'hw_account_open_id';
-  /** 华为账号 UnionID（string）。 */
-  static readonly HW_ACCOUNT_UNION_ID: string = 'hw_account_union_id';
-  /** 最近一次华为云备份时间（number，毫秒）。 */
-  static readonly CLOUD_SYNC_LAST: string = 'cloud_sync_last';
   /** 最近选择的翻译厂商（string）：'bing'|'openai'|'deepseek'|'kimi'|'siliconflow'|'qwen'|'doubao'|'hunyuan'|'minimax'|'zhipu'|'custom'。 */
   static readonly API_PROVIDER: string = 'api_provider';
   /** 阅读时预翻译开关（bool）：打开后阅读器会在后台翻译后续页/章节。 */

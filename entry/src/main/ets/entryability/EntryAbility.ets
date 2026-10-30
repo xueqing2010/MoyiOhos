@@ -13,6 +13,7 @@ import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { AppEnv } from '../common/AppEnv';
 import { OcrService } from 'coreocr';
+import { PageTranslateService } from '../service/PageTranslateService';
 import { Log, ThemeTokens } from 'commons';
 
 /** App shell: persisted palette (蓝白/蓝黑) is applied before loadContent; 旧紫色值迁移到蓝白。 */
@@ -62,7 +63,19 @@ export default class EntryAbility extends UIAbility {
         OcrService.getInstance().ensureInit().catch((e: Error) => {
           Log.warn('EntryAbility', 'OCR prewarm skipped: ' + e.message);
         });
+        PageTranslateService.prewarm().catch((e: Error) => {
+          Log.warn('EntryAbility', 'local OCR/model prewarm skipped: ' + e.message);
+        });
       }, 1500);
+      // 本地 GGUF 首次加载 1–3s；启动后预热，避免首句翻译超时。
+      setTimeout(() => {
+        const translator = AppEnv.getInstance().getLocalTranslator();
+        if (translator !== undefined) {
+          translator.prewarm().catch((e: Error) => {
+            Log.warn('EntryAbility', 'local llama prewarm skipped: ' + e.message);
+          });
+        }
+      }, 3000);
     });
   }
 

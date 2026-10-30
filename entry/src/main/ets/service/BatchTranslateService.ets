@@ -4,7 +4,7 @@ import { Log } from 'commons';
 import { AppEnv } from '../common/AppEnv';
 import { PageRepository } from '../data/PageRepository';
 import { MangaRepository } from '../data/MangaRepository';
-import { PageTranslateService } from './PageTranslateService';
+import { PageTranslateService, TranslatePhase, TranslateProgress } from './PageTranslateService';
 
 const TAG = 'BatchTranslateService';
 
@@ -17,6 +17,9 @@ export class BatchState {
   done: number = 0;
   failed: number = 0;
   currentPage: number = 0;
+  currentPhase: TranslatePhase = TranslatePhase.OCR;
+  currentPercent: number = 0;
+  currentDetail: string = '';
   lastError: string = '';
   failedPageIds: Array<number> = [];
 }
@@ -140,10 +143,19 @@ export class BatchTranslateService {
           break;
         }
         this.state.currentPage = i + 1;
+        this.state.currentPhase = TranslatePhase.OCR;
+        this.state.currentPercent = 0;
+        this.state.currentDetail = '准备 OCR';
         this.emit();
         const pageId = this.pageIds[i];
         try {
-          await PageTranslateService.translatePage(pageId, this.engine);
+          const onProgress = (p: TranslateProgress): void => {
+            this.state.currentPhase = p.phase;
+            this.state.currentPercent = p.percent;
+            this.state.currentDetail = p.detail;
+            this.emit();
+          };
+          await PageTranslateService.translatePage(pageId, this.engine, onProgress);
           this.state.done++;
         } catch (e) {
           this.state.failed++;

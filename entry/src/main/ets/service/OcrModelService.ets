@@ -56,7 +56,8 @@ export class OcrModelService {
 
   static isDownloaded(info: OcrModelInfo): boolean {
     try {
-      return fs.accessSync(OcrModelService.path(info));
+      const path = OcrModelService.path(info);
+      return fs.accessSync(path) && fs.statSync(path).size >= 1024 * 1024;
     } catch (e) {
       return false;
     }

@@ -53,6 +53,15 @@ export class LocalLlamaTranslator implements Translator {
     return this.handle !== undefined;
   }
 
+  /** 启动后台预热：提前加载 GGUF，避免首句翻译承担模型加载时间。 */
+  async prewarm(): Promise<void> {
+    const backend = this.backendGetter();
+    if (backend === undefined || this.modelPath === undefined || this.modelPath.length === 0) {
+      return;
+    }
+    await this.ensureLoaded(backend);
+  }
+
   async translate(req: TranslateRequest): Promise<string> {
     return this.run(req, undefined);
   }

@@ -59,6 +59,12 @@ export class DownloadService {
     return `${AppEnv.getInstance().getContext().cacheDir}/models`;
   }
 
+  /** Ensure both model dirs exist (public for model import/manager). */
+  static ensureModelsDir(): void {
+    DownloadService.ensureDir(DownloadService.modelsDir());
+    DownloadService.ensureDir(DownloadService.cacheModelsDir());
+  }
+
   static finalPath(fileName: string): string {
     return `${DownloadService.modelsDir()}/${fileName}`;
   }
@@ -93,14 +99,29 @@ export class DownloadService {
 
     const finalPath = DownloadService.finalPath(task.fileName);
     const partPath = DownloadService.partPath(task.modelKey);
-    if (fs.accessSync(finalPath)) {
+    let finalSize = 0;
+    try {
+      finalSize = fs.accessSync(finalPath) ? fs.statSync(finalPath).size : 0;
+    } catch (e) {
+      finalSize = 0;
+    }
+    if (finalSize >= 1024 * 1024) {
       const p = this.ensureProgress(task);
       p.status = DownloadStatus.DOWNLOADED;
       p.localPath = finalPath;
+      p.downloadedBytes = finalSize;
+      p.totalBytes = finalSize;
       this.emit(p);
       await DownloadRepository.updateStatus(task.modelKey, DownloadStatus.DOWNLOADED);
       await DownloadRepository.updateLocalPath(task.modelKey, finalPath);
       return;
+    }
+    if (finalSize > 0) {
+      // 0 字节/半截文件不能当作已下载，否则 OCR/GGUF 会在加载时失败。
+      try {
+        fs.unlinkSync(finalPath);
+      } catch (e) {
+      }
     }
 
     // Space precheck (US-9 scene 5).
@@ -310,6 +331,19 @@ export class DownloadService {
 
   private async finalize(task: DownloadTask, partPath: string, finalPath: string,
     progress: DownloadProgress, downloaded: number): Promise<void> {
+    let partSize = 0;
+    try {
+      partSize = fs.statSync(partPath).size;
+    } catch (e) {
+      partSize = downloaded;
+    }
+    const expectedBytes = progress.totalBytes > 0 ? progress.totalBytes : task.totalBytes;
+    if (partSize < 1024 * 1024 || (expectedBytes > 0 && partSize < expectedBytes * 0.9)) {
+      progress.status = DownloadStatus.NOT_DOWNLOADED;
+      progress.error = `下载不完整：${partSize} / ${expectedBytes > 0 ? expectedBytes : '?'} 字节`;
+      this.emit(progress);
+      throw new Error(progress.error);
+    }
     try {
       fs.renameSync(partPath, finalPath);
     } catch (e) {

@@ -115,11 +115,23 @@ export class AppEnv {
   private async restoreLocalModelPath(): Promise<void> {
     const tasks = await DownloadDao.queryAll();
     for (const task of tasks) {
-      if (task.status === DownloadStatus.DOWNLOADED && task.localPath !== undefined) {
-        this.localTranslator?.setModelPath(task.localPath);
-        Log.info('AppEnv', `local model restored: ${task.displayName}`);
-        return;
+      // 只恢复 GGUF 翻译模型；OCR 的 .onnx 任务也在同一张表里，不能误当成本地翻译模型。
+      if (task.status !== DownloadStatus.DOWNLOADED || task.localPath === undefined) {
+        continue;
       }
+      if (!task.fileName.toLowerCase().endsWith('.gguf')) {
+        continue;
+      }
+      try {
+        if (!fs.accessSync(task.localPath) || fs.statSync(task.localPath).size < 1024 * 1024) {
+          continue;
+        }
+      } catch (e) {
+        continue;
+      }
+      this.localTranslator?.setModelPath(task.localPath);
+      Log.info('AppEnv', `local model restored: ${task.displayName}`);
+      return;
     }
   }
 

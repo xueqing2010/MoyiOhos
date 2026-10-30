@@ -68,6 +68,8 @@ interface EdgeTranslateItem {
 export class BingTranslator implements Translator {
   readonly engineType: EngineType = EngineType.BING;
   private session: BingSession | undefined;
+  /** 并发首屏时单飞，避免 6 路线程同时抓同一个会话页。 */
+  private sessionPending: Promise<BingSession> | undefined = undefined;
   private edgeToken: string = '';
   private edgeTokenAt: number = 0;
   /** Consecutive edge-path failures; after 2 we short-circuit to the legacy path. */
@@ -553,10 +555,24 @@ export class BingTranslator implements Translator {
     throw new TranslateError(ErrorKind.CONTENT, '必应返回结构异常，请重试或更换引擎');
   }
 
-  private async ensureSession(): Promise<BingSession> {
+  private ensureSession(): Promise<BingSession> {
     if (this.session !== undefined) {
-      return this.session;
+      return Promise.resolve(this.session);
     }
+    if (this.sessionPending !== undefined) {
+      return this.sessionPending;
+    }
+    const pending = this.fetchSession();
+    this.sessionPending = pending;
+    pending.then(() => {
+      this.sessionPending = undefined;
+    }).catch(() => {
+      this.sessionPending = undefined;
+    });
+    return pending;
+  }
+
+  private async fetchSession(): Promise<BingSession> {
     const headers: Record<string, string> = {
       'User-Agent': UA_DESKTOP,
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',

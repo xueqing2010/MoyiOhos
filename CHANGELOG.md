@@ -8,7 +8,9 @@
 - 新增 DeepSeek、Kimi、硅基流动、腾讯混元、MiniMax 等服务商预设。
 - 本地 PP-OCRv6 det + rec 一键下载并自动启用；det 使用 jsDelivr，rec 使用 gh-proxy。
 - 系统 OCR 启动预热：消除真机首次调用约 36 秒冷启动，预热后单页约 3 秒。
-- 单页文本行 4 路并发翻译（本地 llama 串行），本地 OCR 单页约 6 秒。
+- 单页文本行 6 路并发翻译（本地 llama 串行）+ 页内译文缓存；本地 OCR det 降到 768 长边，真机实测单页 OCR 1.7s、翻译 3.0s、合计 4.7s。
+- 翻译进度条区分 OCR / 翻译 / 保存阶段；批量面板同步显示当前页阶段。
+- 修复本地 OCR 图片路径（媒体 URI + fd 回退）、GGUF 导入必须复制进沙箱、模型恢复只认 .gguf、下载完整性校验。
 - GGUF 翻译模型改用 ModelScope 国内镜像，实测 21.9MB/s。
 - 修复模型管理存储统计为 0B（mkdir EEXIST）并纳入缓存分片。
 
@@ -19,15 +21,16 @@
 - 手机/平板/宽屏 edge-to-edge，修复底部空白与顶部裁切。
 - 左侧五栏使用沉浸材质与切换过渡；Tabs 内容切换动画 320ms。
 - 移除快捷验证工作台、示例数据生成、OCR 自测等开发测试入口。
+- 翻译历史按单本合并：一本书一行，显示累计已译页/章与最近时间，不再每次翻译新增一条。
+- 修复 Tab 点击时旧栏与新栏同时高亮（onTabBarClick 立即更新选中态）。
+- 平板导航轨补沉浸材质；导入页 Scroll 顶部对齐并收紧标题间距，消除大孔隙。
 
-### 华为账号 / 签名
+### 签名 / 本地优先
 
-- 在 AGC 创建「星译 StarFlow」应用（`com.moe.starflow`，APP ID / Client ID 均为 `6917620459514246462`），开启华为账号开放能力。
 - 使用 `devecocli auth login` + `devecocli signature generate` 自动生成调试证书与 Profile，并写入 `build-profile.json5`。
 - 移除受限 ACL 权限 `ohos.permission.FILE_ACCESS_PERSIST`，解除自动签名阻塞；文件导入改由系统文件选择器完成。
 - 真机可安装，模拟器启动验证通过；真机启动需先解锁屏幕（开发者模式下 CLI 不能自动解锁）。
-- **真机华为账号登录验证通过**：PCE-W30 显示「已登录华为账号」，云备份/云恢复入口可用；新增截图 `docs/images/huawei-account-login.jpg`。
-- 华为云同步仍阻塞：AGC 云存储未开通，上传返回 `404 Product does not exist`；且 AGC 提示云开发服务停止新开发者接入，需要白名单或已有云开发项目。
+- **移除华为账号登录与云同步入口**：删除 AccountService / CloudSyncService / MeView 账号卡片，书籍、进度、偏好只保存在本机。
 
 ### 文档
 

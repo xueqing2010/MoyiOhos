@@ -12,6 +12,7 @@ export struct BatchPanel {
   done: number = 0;
   failed: number = 0;
   currentPage: number = 0;
+  phaseDetail: string = '';
   lastError: string = '';
   failedPageIds: Array<number> = [];
   onCancel: () => void = () => {
@@ -23,7 +24,8 @@ export struct BatchPanel {
     Column({ space: 8 }) {
       ProgressCard({
         title: this.running ? '批量翻译中' : '批量翻译完成',
-        phase: `当前第 ${this.currentPage}/${this.total} 页 · 成功 ${this.done} · 失败 ${this.failed}`,
+        phase: `第 ${this.currentPage}/${this.total} 页 · 成功 ${this.done} · 失败 ${this.failed}` +
+          (this.phaseDetail.length > 0 ? ` · ${this.phaseDetail}` : ''),
         done: this.done,
         total: this.total,
         currentName: '',

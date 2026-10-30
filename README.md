@@ -31,11 +31,6 @@
 </p>
 <p align="center"><b>模型管理 / 翻译历史</b></p>
 
-<p align="center">
-  <img src="docs/images/huawei-account-login.jpg" width="720" alt="真机华为账号已登录" />
-</p>
-<p align="center"><b>真机 PCE-W30：华为账号已登录，可执行云备份 / 云恢复</b></p>
-
 > 截图来自 HarmonyOS 7.0.0（API 26）手机模拟器、平板模拟器与 PCE-W30 真机；详细测试记录见 [docs/TESTING.md](docs/TESTING.md)。
 
 ## 主要能力
@@ -50,9 +45,9 @@
 - **沉浸光感**：底部悬浮 Tabs + 27 个 NavDestination 标题栏 + Slider/Toggle 控件统一使用 API 26 `uiMaterial.ImmersiveMaterial`（ULTRA_THIN + interactive + lightEffect）；平板/2in1 使用左侧导航轨
 - **蓝白配色**：蓝白为默认主题，另提供蓝黑夜间；已移除紫色主题，运行时切换并重建 shell
 - **导入与分享**：支持从文件管理器拖入图片/压缩包、碰一碰接收文件导入、漫画多页「华为分享」（Share Kit）
-- **华为账号与云同步**：Account Kit 登录按钮 + Cloud Foundation Kit 云存储备份书架索引/进度/偏好；需 AGC 开通云存储与正式签名
+- **本地优先**：已移除华为账号登录与云同步入口，书籍/进度/偏好仅保存在本机，不依赖账号；应用签名仍用于真机安装
 - **文字方向自动**：覆盖层按每个 OCR 检测框的宽高逐块选择横排/竖排（横宽框→横排、竖长框→竖排），修复横向漫画译文被强制竖排导致的字距过大；设置中新增「自动」档
-- **性能**：单页 OCR 后文本行 4 路并发翻译（本地 llama 串行），目标单页 10 秒内；Tabs 切换动画、阅读覆盖层排版计划缓存、启动前同步持久化主题
+- **性能**：单页 OCR 后文本行 6 路并发翻译（本地 llama 串行）、页内行级译文缓存、本地 OCR 跳过重复解码、启动预热 OCR/GGUF；目标单页 5 秒内；Tabs 切换动画、阅读覆盖层排版计划缓存
 - **数据层**：基于 RDB 的实体、DAO 与仓库封装
 
 ## 工程结构
@@ -125,7 +120,6 @@ devecocli signature generate --force
 ## 文档
 
 - [docs/TESTING.md](docs/TESTING.md)：真机/模拟器测试记录、性能数据与已知限制
-- [docs/HUAWEI_ACCOUNT_AGC.md](docs/HUAWEI_ACCOUNT_AGC.md)：华为账号登录 / AGC Client ID / 签名指纹 / 云同步配置指南
 - [docs/images](docs/images/)：演示截图索引
 - [skills/harmonyos-arkts-app-dev](skills/harmonyos-arkts-app-dev/)：本项目的全流程开发 skill 与坑位复盘
 - [CHANGELOG.md](CHANGELOG.md)：版本变更记录

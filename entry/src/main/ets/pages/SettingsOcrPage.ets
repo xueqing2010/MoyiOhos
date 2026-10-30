@@ -225,8 +225,16 @@ export struct SettingsOcrPage {
     .padding({ top: 8, bottom: 8 })
   }
 
+  /** 本地档位以磁盘实际文件为准，避免 @State 批量赋值未触发重绘时误显示“未接入”。 */
+  private tierAvailable(tier: OcrTier): boolean {
+    if (tier.id === 'local') {
+      return OcrModelService.isDownloaded(this.models[0]) && OcrModelService.isDownloaded(this.models[1]);
+    }
+    return tier.available;
+  }
+
   private async pickTier(tier: OcrTier): Promise<void> {
-    if (!tier.available) {
+    if (!this.tierAvailable(tier)) {
       if (tier.id === 'local') {
         await this.downloadAll();
         return;
@@ -321,7 +329,7 @@ export struct SettingsOcrPage {
         Image($r('app.media.ic_check'))
           .width(16)
           .height(16)
-          .fillColor(pp.tier.available ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_TERTIARY)
+          .fillColor(this.tierAvailable(pp.tier) ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_TERTIARY)
       }
       .width(30)
       .height(30)
@@ -335,9 +343,9 @@ export struct SettingsOcrPage {
             .fontSize(ThemeTokens.FONT_CAPTION)
             .fontWeight(FontWeight.Medium)
             .fontColor(ThemeTokens.TEXT_PRIMARY)
-          Text(pp.tier.available ? (pp.active ? '当前档位' : '可用') : '未接入')
+          Text(this.tierAvailable(pp.tier) ? (pp.active ? '当前档位' : '可用') : '未接入')
             .fontSize(10)
-            .fontColor(pp.tier.available ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_HINT)
+            .fontColor(this.tierAvailable(pp.tier) ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_HINT)
             .padding({ left: 6, right: 6, top: 1, bottom: 1 })
             .borderRadius(ThemeTokens.RADIUS_PILL)
             .backgroundColor(ThemeTokens.SURFACE_VARIANT)

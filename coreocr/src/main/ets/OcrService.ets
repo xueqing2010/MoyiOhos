@@ -59,6 +59,14 @@ export class OcrService {
     return await engine.recognize(pagePath);
   }
 
+  /** 启动预热本地模型（仅在用户选择 local 档位时）；失败不抛到 UI。 */
+  async prewarmLocal(): Promise<void> {
+    if (!this.localEnabled || this.localConfig === undefined) {
+      return;
+    }
+    await LocalOcrEngine.getInstance().init(this.localConfig);
+  }
+
   /** Capability probe; throws a readable Error when OCR is unavailable (US-5 scene 7). */
   async ensureInit(lang: OcrLang = OcrLang.JPN): Promise<void> {
     this.lastLang = lang;
@@ -105,7 +113,7 @@ export class OcrService {
   }
 
   /** Run line-level recognition; returns regions in original-pixel coords. */
-  async recognize(pixelMap: image.PixelMap, lang: OcrLang = OcrLang.JPN,
+  async recognize(pixelMap: image.PixelMap | undefined, lang: OcrLang = OcrLang.JPN,
     pagePath?: string): Promise<Array<OcrRegion>> {
     if (this.localEnabled && this.localConfig !== undefined && pagePath !== undefined) {
       const engine = LocalOcrEngine.getInstance();
@@ -114,6 +122,9 @@ export class OcrService {
       return await engine.recognize(pagePath);
     }
     await this.ensureInit(lang);
+    if (pixelMap === undefined) {
+      throw new Error('系统 OCR 缺少页面像素图');
+    }
     const visionInfo: textRecognition.VisionInfo = { pixelMap: pixelMap };
     const result: textRecognition.TextRecognitionResult =
       await textRecognition.recognizeText(visionInfo);

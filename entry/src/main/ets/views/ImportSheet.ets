@@ -15,6 +15,8 @@ export struct ImportSheet {
   };
   /** 打开导入向导的可选回调（未提供时由面板默认跳转）。 */
   onWizard?: () => void = undefined;
+  /** 作为 Tab 内容时去掉顶部内边距，避免标题与卡片之间出现大孔隙。 */
+  compactTop: boolean = false;
 
   build() {
     Column() {
@@ -28,7 +30,7 @@ export struct ImportSheet {
     .padding({
       left: ThemeTokens.PAGE_PADDING,
       right: ThemeTokens.PAGE_PADDING,
-      top: ThemeTokens.PAGE_PADDING,
+      top: this.compactTop ? 0 : ThemeTokens.PAGE_PADDING,
       bottom: 30
     })
     .width('100%')
