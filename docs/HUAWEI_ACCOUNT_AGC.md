@@ -101,9 +101,23 @@ hdc -t <serial> shell hilog -x | grep -iE 'Account|clientId|profile|100150'
 | 错误 | 原因 | 处理 |
 |---|---|---|
 | 1001502003 / Invalid clientId or profile | client_id 未配置、配置错误，或 Profile 无效 | 检查 entry/module.json5 的 client_id；重新申请 Profile 并签名 |
+| 9568332 / install sign info inconsistent | 设备上已装包的签名证书与当前 HAP 不一致（换过调试证书/Profile 后最常见） | 卸载旧包再装，或在 DevEco 中 Clean + Rebuild 后用同一签名重新部署 |
 | 1001500001 / 指纹证书校验失败 | AGC 未配置证书指纹，或换证书后未更新 | 在 AGC 添加 SHA-256 指纹，等 10 分钟并升级 versionCode |
 | 模拟器登录失败 | 模拟器缺少华为账号面板/能力 | 使用真机验证 |
 | 授权页拉起后无回调 | 签名与 AGC 应用不一致 | 确认包名、证书指纹、Profile 三者对应同一个 AGC 应用 |
+
+### 换签名后 DevEco 部署报 9568332 install sign info inconsistent
+
+这是签名不一致，不是代码错误。设备上已安装包的证书与 DevEco 当前构建出的 HAP 证书不是同一套。处理顺序：
+
+1. 确认 DevEco File → Project Structure → Signing Configs 使用的是当前 build-profile.json5 中同一套 .p12/.cer/.p7b；
+2. 在 DevEco 执行 Build → Clean Project，再 Build → Rebuild Project；
+3. 卸载设备上的旧包（会清本地数据，云同步文件不在包内）：
+   devecocli device app uninstall --device 2BD0223929003920 --bundle com.moe.starflow
+4. 再在 DevEco 点运行，或直接：
+   devecocli run --module entry --device 2BD0223929003920 --uninstall
+
+不要混用两套签名：用 devecocli signature generate 换过证书后，旧安装包必须卸载一次；之后 DevEco 与 CLI 使用同一份 build-profile.json5 即可正常增量安装。
 
 ## 5. 云同步额外配置
 
