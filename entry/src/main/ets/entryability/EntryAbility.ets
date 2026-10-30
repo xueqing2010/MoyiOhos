@@ -12,6 +12,7 @@ import { window } from '@kit.ArkUI';
 import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { AppEnv } from '../common/AppEnv';
+import { OcrService } from 'coreocr';
 import { Log, ThemeTokens } from 'commons';
 
 /** App shell: persisted palette (蓝白/蓝黑) is applied before loadContent; 旧紫色值迁移到蓝白。 */
@@ -56,6 +57,12 @@ export default class EntryAbility extends UIAbility {
       }
       Log.info('EntryAbility', 'Succeeded in loading the content.');
       this.configureWindow(windowStage);
+      // 系统 OCR 首次 init 在真机上可能耗时数十秒；启动后后台预热，避免首张漫画翻译被冷启动拖到 1 分钟。
+      setTimeout(() => {
+        OcrService.getInstance().ensureInit().catch((e: Error) => {
+          Log.warn('EntryAbility', 'OCR prewarm skipped: ' + e.message);
+        });
+      }, 1500);
     });
   }
 
