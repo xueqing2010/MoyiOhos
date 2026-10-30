@@ -2,6 +2,37 @@
 
 星译 StarFlow 是一个运行在 HarmonyOS 上的**漫画 / 小说 / 文本翻译工作台**：识别屏幕或图片中的文字，翻译后以覆盖层重新排版渲染回原图，同时提供小说阅读与整章翻译能力。翻译既可以走在线接口，也可以完全在端侧用内置的 llama.cpp 完成。
 
+适配 **Phone / Tablet / 2in1**：手机使用底部沉浸光感 Tab，平板与宽屏自动切换左侧导航轨和双列/双页布局。
+
+## 演示
+
+<p align="center">
+  <img src="docs/images/phone-shelf.jpg" width="260" alt="手机书架与蓝白主题" />
+  <img src="docs/images/tablet-wide.jpg" width="420" alt="平板宽屏与左侧导航轨" />
+  <img src="docs/images/text-translate.jpg" width="420" alt="文本翻译" />
+</p>
+
+<p align="center">
+  <b>手机书架</b> · <b>平板宽屏</b> · <b>文本翻译</b>
+</p>
+
+<p align="center">
+  <img src="docs/images/ocr-overlay.jpg" width="640" alt="漫画 OCR 译文覆盖层" />
+</p>
+<p align="center"><b>真机漫画 OCR：日文识别后中文译文回填</b></p>
+
+| 原文 | 翻译后 |
+|---|---|
+| <img src="docs/images/reader-original.jpg" width="420" alt="漫画原文" /> | <img src="docs/images/ocr-overlay.jpg" width="420" alt="漫画译文" /> |
+
+<p align="center">
+  <img src="docs/images/model-manager.jpg" width="260" alt="模型管理与存储占用" />
+  <img src="docs/images/history.jpg" width="420" alt="翻译历史" />
+</p>
+<p align="center"><b>模型管理 / 翻译历史</b></p>
+
+> 截图来自 HarmonyOS 7.0.0（API 26）手机模拟器、平板模拟器与 PCE-W30 真机；详细测试记录见 [docs/TESTING.md](docs/TESTING.md)。
+
 ## 主要能力
 
 - **漫画翻译**：Core Vision Kit 文字识别 → 版面分析 → 译文覆盖层渲染，支持阅读态与对照态
@@ -9,7 +40,7 @@
 - **翻译引擎**：统一 `Translator` 抽象，内置必应、OpenAI 兼容接口、本地 llama.cpp 三种实现；服务商预设含 DeepSeek、Kimi、硅基流动、通义千问、豆包、腾讯混元、MiniMax、智谱、OpenAI、自定义端点
 - **预翻译/整本翻译**：可在阅读设置开启后台预翻译后续页/章（默认关闭，避免抢占首屏网络）；漫画书架「整本翻译」、小说菜单「整本翻译」可一次翻译整本
 - **本地推理**：内置 llama.cpp（`entry/src/main/cpp/llama.cpp`），支持加载 GGUF 模型离线翻译；Hy-MT2 模型改走 ModelScope 国内镜像
-- **OCR 本地模型**：设置→OCR 点任一模型会自动依次下载 det + rec 并启用本地档位；det 走 jsDelivr、rec 走 raw.githack 加速（不随安装包分发），由 ONNX Runtime 鸿蒙 NAPI 本机推理
+- **OCR 本地模型**：设置→OCR 点任一模型会自动依次下载 det + rec 并启用本地档位；det 走 jsDelivr、rec 走 gh-proxy 加速（不随安装包分发），由 ONNX Runtime 鸿蒙 NAPI 本机推理；模型目录与缓存分片占用可在「模型管理」查看
 - **渲染健壮性**：译文白块按页面像素边界裁剪，并限制在页面图像画布内，避免越界/错位
 - **沉浸光感**：底部悬浮 Tabs + 27 个 NavDestination 标题栏 + Slider/Toggle 控件统一使用 API 26 `uiMaterial.ImmersiveMaterial`（ULTRA_THIN + interactive + lightEffect）；平板/2in1 使用左侧导航轨
 - **蓝白配色**：蓝白为默认主题，另提供蓝黑夜间；已移除紫色主题，运行时切换并重建 shell
@@ -50,11 +81,17 @@ StarFlowOhos/
 2. 用 DevEco Studio 打开本目录，等待 `hvigor` 同步依赖（`ohpm install`）
 3. 连接真机或启动模拟器，选择 `entry` 模块运行
 
-命令行构建：
+命令行构建（DevEco Studio 6 / devecocli）：
 
 ```bash
+# 推荐：devecocli 一键构建 debug HAP
+devecocli build --build-mode debug
+
+# 或使用 hvigor
 hvigorw assembleHap --mode module -p product=default
 ```
+
+产物：`entry/build/default/outputs/default/entry-default-signed.hap`
 
 ## 签名说明
 
@@ -75,6 +112,12 @@ git update-index --skip-worktree build-profile.json5
 - 本仓库不包含 GGUF 模型文件；模型许可归各自发布方。
 
 完整归属与许可文本见 [NOTICE.md](NOTICE.md) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 文档
+
+- [docs/TESTING.md](docs/TESTING.md)：真机/模拟器测试记录、性能数据与已知限制
+- [docs/images](docs/images/)：演示截图索引
+- [CHANGELOG.md](CHANGELOG.md)：版本变更记录
 
 ## 许可证
 
