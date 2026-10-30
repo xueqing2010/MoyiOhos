@@ -208,10 +208,10 @@ struct Index {
       .backgroundColor(this.currentTab === index ? ThemeTokens.SURFACE_SECONDARY : Color.Transparent)
       .systemMaterial(new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        interactive: true,
-        lightEffect: {}
+        interactive: false,
+        lightEffect: null,
+        applyShadow: false
       }))
-      .animation({ duration: Motion.FAST, curve: Curve.EaseOut })
       .onClick(() => {
         this.currentTab = index;
       })
@@ -233,8 +233,9 @@ struct Index {
       .backgroundColor(this.currentTab === index ? ThemeTokens.SURFACE_SECONDARY : Color.Transparent)
       .systemMaterial(new uiMaterial.ImmersiveMaterial({
         style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        interactive: true,
-        lightEffect: {}
+        interactive: false,
+        lightEffect: null,
+        applyShadow: false
       }))
       .onClick(() => {
         this.currentTab = index;
@@ -289,8 +290,9 @@ struct Index {
     .backgroundBlurStyle(this.immersiveSupported ? BlurStyle.NONE : BlurStyle.COMPONENT_THICK)
     .systemMaterial(new uiMaterial.ImmersiveMaterial({
       style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-      interactive: true,
-      lightEffect: {}
+      interactive: false,
+      lightEffect: null,
+      applyShadow: false
     }))
     .alignItems(HorizontalAlign.Start)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
@@ -375,8 +377,9 @@ struct Index {
       systemMaterial: this.immersiveSupported
         ? new uiMaterial.ImmersiveMaterial({
           style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-          interactive: true,
-          lightEffect: {}
+          interactive: false,
+          lightEffect: null,
+          applyShadow: false
         })
         : undefined
     })
