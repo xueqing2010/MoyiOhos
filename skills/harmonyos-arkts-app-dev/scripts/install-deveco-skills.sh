@@ -3,16 +3,17 @@ set -euo pipefail
 
 # Install DevEco official HarmonyOS skills into a DSH skills directory.
 # Usage:
-#   ./install-deveco-skills.sh                 # selected, recommended set
-#   ./install-deveco-skills.sh --all           # all 49 official skills
+#   ./install-deveco-skills.sh                 # all 49 official skills
+#   ./install-deveco-skills.sh --recommended   # selected 30 skills
 #   ./install-deveco-skills.sh --dest DIR      # custom destination
 
 DEST="${HOME}/.dsh/skills"
-MODE="selected"
+MODE="all"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --all) MODE="all"; shift ;;
+    --recommended) MODE="selected"; shift ;;
     --dest) DEST="$2"; shift 2 ;;
     *) echo "unknown arg: $1"; exit 2 ;;
   esac

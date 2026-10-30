@@ -38,7 +38,7 @@ description: HarmonyOS NEXT（ArkTS/ArkUI，API 26，DevEco Studio 6）应用从
 
 ## DevEco 官方内置 Skills
 
-DevEco 自带 49 个官方 HarmonyOS Skills，本项目已安装 30 个最相关的到 `~/.dsh/skills/`，可直接用 `skill` 工具按名称加载。
+DevEco 自带 49 个官方 HarmonyOS Skills，本项目已全部安装到 `~/.dsh/skills/`，可直接用 `skill` 工具按名称加载。
 
 写代码前的加载顺序：
 

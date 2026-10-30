@@ -1,6 +1,6 @@
 # DevEco 官方内置 Skills 索引
 
-DevEco 通过 `devecocli skills` 提供 49 个官方 HarmonyOS Skills。本项目已安装其中最相关的 30 个到 `~/.dsh/skills/`，可直接用 `skill` 工具按名称加载。
+DevEco 通过 `devecocli skills` 提供 49 个官方 HarmonyOS Skills。本项目已全部安装到 `~/.dsh/skills/`，可直接用 `skill` 工具按名称加载。
 
 ## 加载顺序（写代码前）
 
@@ -15,7 +15,7 @@ DevEco 通过 `devecocli skills` 提供 49 个官方 HarmonyOS Skills。本项�
 9. **动效/悬浮窗**：longtake-transition / arkuikit-window-floatwindow；
 10. **架构/迁移**：arkui-mvvm-pattern / statemgt-migration。
 
-## 已安装清单（30）
+## 核心 30 个（重点使用）
 
 | Skill | 何时用 |
 |---|---|
@@ -50,12 +50,27 @@ DevEco 通过 `devecocli skills` 提供 49 个官方 HarmonyOS Skills。本项�
 | hmos-runtime-fix-skill | 运行时崩溃/白屏/启动失败 |
 | app-metadata-audit-skill | AGC 上架元数据合规审查 |
 
-其余 19 个（Scan Kit、Map Kit、Push Kit、LiveView、支付、ASCF、Ads、app continuity 等）可按需安装：
+## 其余 19 个（已安装）
 
-```bash
-devecocli skills list
-devecocli skills add --path ~/.dsh/skills --skill <name> --force
-```
+- hmos-ads-kit-access
+- hmos-app-continuity-skill
+- hmos-arkui-knowledge-retriever
+- hmos-ascf-assistant
+- hmos-ascf-convert-taro
+- hmos-ascf-convert-uniapp
+- hmos-atomicservice-assistant
+- hmos-cppcrash-analysis
+- hmos-fdleak-analysis
+- hmos-jsleak-analysis
+- hmos-live-view-kit-build-location
+- hmos-map-kit-map-creation
+- hmos-map-kit-poi-search
+- hmos-map-kit-route-planning
+- hmos-native-memleak-analysis
+- hmos-payment-kit-huawei-payment-integration
+- hmos-push-kit
+- hmos-scan-kit-customscan
+- hmos-scan-kit-defaultscan
 
 ## 与本 skill 的分工
 

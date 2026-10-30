@@ -12,7 +12,7 @@ HarmonyOS NEXT（ArkTS / ArkUI，API 26）应用从零开发、移植、签名�
   - SKILL.md：主流程与铁律
   - references/：架构、UI、OCR、翻译、账号签名、测试、全量坑位、案例复盘
   - scripts/doctor.sh：项目/设备/签名/权限只读体检
-  - scripts/install-deveco-skills.sh：批量安装 DevEco 官方 skills（默认 30 个，可选 --all）
+  - scripts/install-deveco-skills.sh：批量安装 DevEco 官方 skills（默认全部 49 个；--recommended 只装 30 个）
 
 ## 安装到 DSH（可选）
 
