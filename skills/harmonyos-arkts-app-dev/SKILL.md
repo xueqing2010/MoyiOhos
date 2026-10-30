@@ -36,6 +36,30 @@ description: HarmonyOS NEXT（ArkTS/ArkUI，API 26，DevEco Studio 6）应用从
 9. **文档与截图是交付物**：每个阶段留下可复现命令、截图、已知限制。
 10. **不要和工具链对抗**：能用 devecocli 就用 CLI；GUI 只用于确认状态，避免被 IDE 缓存和 AX 树拖住。
 
+## DevEco 官方内置 Skills
+
+DevEco 自带 49 个官方 HarmonyOS Skills，本项目已安装 30 个最相关的到 `~/.dsh/skills/`，可直接用 `skill` 工具按名称加载。
+
+写代码前的加载顺序：
+
+1. `hmos-arkui-develop-skill`（写第一个 .ets 前必读）；
+2. `hmos-one-sdk-skill`（写任何 @kit.* import 前必读）；
+3. `hmos-arkts-syntax-checker`（构建/语法错误）；
+4. `hmos-multidevice-scenario-entry`（多设备总入口）；
+5. 账号/AGC 按需加载 login-button / login-api / connect-api-cli。
+
+完整清单与分工见 [references/deveco-official-skills.md](references/deveco-official-skills.md)，最常踩的 26 条 ArkTS 约束见 [references/arkts-official-gotchas.md](references/arkts-official-gotchas.md)。
+
+安装全部/单个官方 skill：
+
+```bash
+devecocli skills list
+devecocli skills add --path ~/.dsh/skills --skill hmos-arkui-develop-skill --force
+devecocli skills add --all --path ~/.dsh/skills --force
+```
+
+> 原则：官方 skill 提供准确 API/错误码，本 skill 提供工程顺序与踩坑经验；不要重复抄官方 references。
+
 ## 全流程总览
 
 | 阶段 | 目标 | 通过门槛 |
@@ -332,4 +356,7 @@ devecocli log --device <serial> --bundle-name <bundle> --crash --tail 50
 - [references/testing-and-automation.md](references/testing-and-automation.md)
 - [references/pitfalls.md](references/pitfalls.md)
 - [references/case-study-starflow.md](references/case-study-starflow.md)
+- [references/deveco-official-skills.md](references/deveco-official-skills.md)
+- [references/arkts-official-gotchas.md](references/arkts-official-gotchas.md)
+- [scripts/install-deveco-skills.sh](scripts/install-deveco-skills.sh)
 - [scripts/doctor.sh](scripts/doctor.sh)
