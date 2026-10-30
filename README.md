@@ -116,6 +116,7 @@ git update-index --skip-worktree build-profile.json5
 ## 文档
 
 - [docs/TESTING.md](docs/TESTING.md)：真机/模拟器测试记录、性能数据与已知限制
+- [docs/HUAWEI_ACCOUNT_AGC.md](docs/HUAWEI_ACCOUNT_AGC.md)：华为账号登录 / AGC Client ID / 签名指纹 / 云同步配置指南
 - [docs/images](docs/images/)：演示截图索引
 - [CHANGELOG.md](CHANGELOG.md)：版本变更记录
 
