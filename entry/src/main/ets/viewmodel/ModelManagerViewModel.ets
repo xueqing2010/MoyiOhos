@@ -86,21 +86,25 @@ export class ModelManagerViewModel {
   static async loadStorageStats(): Promise<StorageStats> {
     const stats = new StorageStats();
     await AppEnv.ready();
-    const dir = DownloadService.modelsDir();
-    try {
-      fs.mkdirSync(dir, true);
-      const names: Array<string> = fs.listFileSync(dir);
-      for (const name of names) {
-        try {
-          const size: number = fs.statSync(`${dir}/${name}`).size;
-          stats.usedBytes += size;
-          stats.fileCount += 1;
-        } catch (e) {
-          // 单个文件读取失败跳过
+    const dirs: Array<string> = [DownloadService.modelsDir(), DownloadService.cacheModelsDir()];
+    for (const dir of dirs) {
+      try {
+        if (!fs.accessSync(dir)) {
+          fs.mkdirSync(dir, true);
         }
+        const names: Array<string> = fs.listFileSync(dir);
+        for (const name of names) {
+          try {
+            const size: number = fs.statSync(`${dir}/${name}`).size;
+            stats.usedBytes += size;
+            stats.fileCount += 1;
+          } catch (e) {
+            // 单个文件读取失败跳过
+          }
+        }
+      } catch (e) {
+        // 目录不存在或不可读
       }
-    } catch (e) {
-      // 目录不存在或不可读
     }
     try {
       stats.freeBytes = await statvfs.getFreeSize(AppEnv.getInstance().getContext().filesDir);
