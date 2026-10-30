@@ -19,7 +19,8 @@ export class ModelPresets {
     modelKey: 'HY_MT2_Q4_KM',
     displayName: 'Hy-MT2 1.8B',
     quant: 'Q4_K_M',
-    url: 'https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q4_K_M.gguf',
+    // 国内真机 HuggingFace 不可达；改用魔搭 ModelScope 镜像（实测 3MB/s 级）。
+    url: 'https://modelscope.cn/models/Tencent-Hunyuan/Hy-MT2-1.8B-GGUF/resolve/master/Hy-MT2-1.8B-Q4_K_M.gguf',
     sizeBytes: 1133080448,
     md5: '436f3ec23b236b2ac1d05dd7a713f8ae',
     supported: true

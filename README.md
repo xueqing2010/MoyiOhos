@@ -8,7 +8,7 @@
 - **小说阅读**：TXT / EPUB / ZIP-HTML 解析、章节切分、分页器、阅读进度保存
 - **翻译引擎**：统一 `Translator` 抽象，内置必应、OpenAI 兼容接口、本地 llama.cpp 三种实现；服务商预设含 DeepSeek、Kimi、硅基流动、通义千问、豆包、腾讯混元、MiniMax、智谱、OpenAI、自定义端点
 - **预翻译/整本翻译**：可在阅读设置开启后台预翻译后续页/章（默认关闭，避免抢占首屏网络）；漫画书架「整本翻译」、小说菜单「整本翻译」可一次翻译整本
-- **本地推理**：内置 llama.cpp（`entry/src/main/cpp/llama.cpp`），支持加载 GGUF 模型离线翻译
+- **本地推理**：内置 llama.cpp（`entry/src/main/cpp/llama.cpp`），支持加载 GGUF 模型离线翻译；Hy-MT2 模型改走 ModelScope 国内镜像
 - **OCR 本地模型**：设置→OCR 点任一模型会自动依次下载 det + rec 并启用本地档位；det 走 jsDelivr、rec 走 raw.githack 加速（不随安装包分发），由 ONNX Runtime 鸿蒙 NAPI 本机推理
 - **渲染健壮性**：译文白块按页面像素边界裁剪，并限制在页面图像画布内，避免越界/错位
 - **沉浸光感**：底部悬浮 Tabs + 27 个 NavDestination 标题栏 + Slider/Toggle 控件统一使用 API 26 `uiMaterial.ImmersiveMaterial`（ULTRA_THIN + interactive + lightEffect）；平板/2in1 使用左侧导航轨
