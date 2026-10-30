@@ -19,13 +19,7 @@ import { ImportView } from '../views/ImportView';
 import { TextTranslateView } from '../views/TextTranslateView';
 import { HistoryView } from '../views/HistoryView';
 import { MeView } from '../views/MeView';
-import { SpikeWorkbenchPage } from '../pages/SpikeWorkbenchPage';
 import { AboutPage } from '../pages/AboutPage';
-import { SpikeImportPage } from '../pages/SpikeImportPage';
-import { SpikeOcrPage } from '../pages/SpikeOcrPage';
-import { SpikeRenderPage } from '../pages/SpikeRenderPage';
-import { SpikeEnginePage } from '../pages/SpikeEnginePage';
-import { SpikeNapiPage } from '../pages/SpikeNapiPage';
 import { ModelManagerPage } from '../pages/ModelManagerPage';
 import { ReaderPage } from '../pages/ReaderPage';
 import { NovelReaderPage } from '../pages/NovelReaderPage';
@@ -201,6 +195,12 @@ struct Index {
       .padding({ left: 14, right: 14 })
       .borderRadius(ThemeTokens.RADIUS_SMALL)
       .backgroundColor(this.currentTab === index ? ThemeTokens.SURFACE_SECONDARY : Color.Transparent)
+      .systemMaterial(new uiMaterial.ImmersiveMaterial({
+        style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+        interactive: true,
+        lightEffect: {}
+      }))
+      .animation({ duration: Motion.FAST, curve: Curve.EaseOut })
       .onClick(() => {
         this.currentTab = index;
       })
@@ -269,8 +269,15 @@ struct Index {
     .width(this.sizeClass === WindowSizeClass.LG ? 216 : 88)
     .height('100%')
     .padding({ left: 10, right: 10, top: 14 })
-    .backgroundColor(ThemeTokens.SURFACE_VARIANT)
+    .backgroundColor(ThemeTokens.MATERIAL_TINT)
+    .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
+    .systemMaterial(new uiMaterial.ImmersiveMaterial({
+      style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+      interactive: true,
+      lightEffect: {}
+    }))
     .alignItems(HorizontalAlign.Start)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 
   @Builder
@@ -297,7 +304,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .padding({ bottom: 84 })
+    .padding({ bottom: 68 })
     .backgroundColor(ThemeTokens.SURFACE)
     // 主题切换时强制重建每个 Tab 内容，避免 Tabs 缓存旧色板。
     .key('tab-' + index + '-' + this.themeRev)
@@ -361,6 +368,7 @@ struct Index {
     .onChange((index: number) => {
       this.currentTab = index;
     })
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')
   }
@@ -396,28 +404,19 @@ struct Index {
       .layoutWeight(1)
       .height('100%')
       .backgroundColor(ThemeTokens.SURFACE)
+      .key('wide-' + this.currentTab)
+      .transition(Motion.content())
     }
     .width('100%')
     .height('100%')
     .backgroundColor(ThemeTokens.SURFACE)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
   }
 
   @Builder
   pageDestination(name: string) {
-    if (name === Routes.SPIKE_WORKBENCH) {
-      SpikeWorkbenchPage()
-    } else if (name === Routes.ABOUT) {
+    if (name === Routes.ABOUT) {
       AboutPage()
-    } else if (name === Routes.SPIKE_IMPORT) {
-      SpikeImportPage()
-    } else if (name === Routes.SPIKE_OCR) {
-      SpikeOcrPage()
-    } else if (name === Routes.SPIKE_RENDER) {
-      SpikeRenderPage()
-    } else if (name === Routes.SPIKE_ENGINE) {
-      SpikeEnginePage()
-    } else if (name === Routes.SPIKE_NAPI) {
-      SpikeNapiPage()
     } else if (name === Routes.MODEL_MANAGER) {
       ModelManagerPage()
     } else if (name === Routes.READER) {
@@ -490,6 +489,7 @@ struct Index {
     .mode(NavigationMode.Stack)
     .navDestination(this.pageDestination)
     .backgroundColor(ThemeTokens.SURFACE)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')
     .onAreaChange((oldArea: Area, newArea: Area) => {

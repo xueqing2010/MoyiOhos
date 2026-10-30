@@ -154,26 +154,6 @@ export class NovelImportService {
     return result;
   }
 
-  /** 导入示例小说（rawfile/demo/novel/demo_novel.txt）。 */
-  static async importDemoNovel(onProgress: (p: NovelImportProgress) => void): Promise<Novel> {
-    await AppEnv.ready();
-    onProgress(makeNovelProgress('读取示例', 0, 1, 'demo_novel.txt'));
-    const ctx = AppEnv.getInstance().getContext();
-    const bytes = await ctx.resourceManager.getRawFileContent('demo/novel/demo_novel.txt');
-    const parsed = TxtParser.parse(bytes, '示例小说 · 旅立ちの朝');
-    onProgress(makeNovelProgress('解析示例', 0, parsed.novel.chapters.length, parsed.novel.title));
-    if (parsed.novel.chapters.length === 0) {
-      throw new Error('示例小说内容为空');
-    }
-    onProgress(makeNovelProgress('建档', 0, parsed.novel.chapters.length, parsed.novel.title));
-    const cover = NovelImportService.coverNameFor(parsed.novel.title);
-    const novel = await NovelRepository.createFromParsed(parsed.novel, '', cover);
-    novel.translateStatus = TranslateStatus.NONE;
-    onProgress(makeNovelProgress('完成', parsed.novel.chapters.length,
-      parsed.novel.chapters.length, parsed.novel.title));
-    return novel;
-  }
-
   // ---------- 单本导入 ----------
 
   /** 返回 undefined 表示中途取消（不留残缺记录）。 */

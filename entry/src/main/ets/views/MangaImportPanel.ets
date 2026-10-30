@@ -5,7 +5,6 @@ import { ThemeTokens, Log } from 'commons';
 import { AppEnv } from '../common/AppEnv';
 import { Routes, makeImportWizardParams } from '../common/Routes';
 import { ImportFailure, ImportProgress, ImportService, makeImportProgress } from '../service/ImportService';
-import { DemoDataResult, DemoDataService } from '../service/DemoDataService';
 import { ShelfViewModel } from '../viewmodel/ShelfViewModel';
 import { ProgressCard } from '../components/ProgressCard';
 import { Artwork } from '../components/Artwork';
@@ -31,7 +30,6 @@ export struct MangaImportPanel {
   @State private failures: Array<ImportFailure> = [];
   @State private hint: string = '';
   @State private hintOk: boolean = false;
-  @State private demoBusy: boolean = false;
   private cancelRequested: boolean = false;
 
   private emitProgress(p: ImportProgress): void {
@@ -58,7 +56,7 @@ export struct MangaImportPanel {
   }
 
   private busy(): boolean {
-    return this.importing || this.demoBusy;
+    return this.importing;
   }
 
   // ---------- 三通道入口 ----------
@@ -196,26 +194,6 @@ export struct MangaImportPanel {
     });
   }
 
-  private async generateDemo(): Promise<void> {
-    if (this.busy()) {
-      return;
-    }
-    this.reset();
-    this.demoBusy = true;
-    try {
-      const result: DemoDataResult = await DemoDataService.generateSampleManga();
-      this.showHint(result.message, true);
-      if (result.manga !== undefined) {
-        ShelfViewModel.notifyChanged();
-        this.onImported([result.manga]);
-      }
-    } catch (e) {
-      Log.warn('MangaImportPanel', `demo generation failed: ${e}`);
-      this.showHint(`${e}`, false);
-    }
-    this.demoBusy = false;
-  }
-
   private openWizard(): void {
     if (this.busy()) {
       return;
@@ -310,12 +288,6 @@ export struct MangaImportPanel {
           .fontWeight(FontWeight.Bold)
           .fontColor(ThemeTokens.TEXT_PRIMARY)
           .layoutWeight(1)
-        if (this.demoBusy) {
-          LoadingProgress()
-            .width(18)
-            .height(18)
-            .color(ThemeTokens.PRIMARY)
-        }
       }
       .width('100%')
 
@@ -360,20 +332,6 @@ export struct MangaImportPanel {
       }
 
       this.failureList()
-
-      Divider()
-        .color(ThemeTokens.DIVIDER)
-        .margin({ top: 2, bottom: 2 })
-
-      Text('没有素材？可先体验示例数据')
-        .fontSize(ThemeTokens.FONT_SMALL)
-        .fontColor(ThemeTokens.TEXT_HINT)
-        .width('100%')
-
-      this.channelCard(Artwork.ICON_DEMO, '生成示例漫画 · 紫夜',
-        '本地示例 6 页，导入后可立即进入阅读器验证全流程', true, () => {
-          this.generateDemo();
-        })
 
       this.channelCard(Artwork.ICON_IMPORT_WIZARD, '导入向导',
         '先确认名称、封面与页序，再正式建档', false, () => {

@@ -7,12 +7,6 @@ export class Routes {
   // MVP-1
   static readonly READER: string = 'ReaderPage';
   static readonly MODEL_MANAGER: string = 'ModelManagerPage';
-  static readonly SPIKE_WORKBENCH: string = 'SpikeWorkbenchPage';
-  static readonly SPIKE_IMPORT: string = 'SpikeImportPage';
-  static readonly SPIKE_OCR: string = 'SpikeOcrPage';
-  static readonly SPIKE_RENDER: string = 'SpikeRenderPage';
-  static readonly SPIKE_NAPI: string = 'SpikeNapiPage';
-  static readonly SPIKE_ENGINE: string = 'SpikeEnginePage';
   static readonly ABOUT: string = 'AboutPage';
   // MVP-2 (stage 2)
   static readonly NOVEL_READER: string = 'NovelReaderPage';

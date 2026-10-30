@@ -20,7 +20,7 @@ export class PreTranslateService {
 
   static async isEnabled(): Promise<boolean> {
     try {
-      return await SettingsRepository.getBool(SettingsKeys.PRETRANSLATE_ENABLED, true);
+      return await SettingsRepository.getBool(SettingsKeys.PRETRANSLATE_ENABLED, false);
     } catch (e) {
       return false;
     }

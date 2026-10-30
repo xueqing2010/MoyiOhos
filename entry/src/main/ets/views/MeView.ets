@@ -259,10 +259,6 @@ export struct MeView {
       makeEntry('本地模型', 'GGUF 下载、进度/速度、暂停继续、导入与存储统计', $r('app.media.ic_model'),
         Routes.MODEL_MANAGER)
     ]));
-    groups.push(makeGroup('尖刀验证工作台', $r('app.media.ic_workbench'), [
-      makeEntry('打开工作台', '7 项技术验证与最近结果（P0-1 ~ P0-6 + ENGINE）', $r('app.media.ic_workbench'),
-        Routes.SPIKE_WORKBENCH)
-    ]));
     groups.push(makeGroup('常见问题', $r('app.media.ic_faq'), [
       makeEntry('常见问题', '引擎、模型、OCR、导入与隐私的疑问排查', $r('app.media.ic_faq'), Routes.FAQ)
     ]));

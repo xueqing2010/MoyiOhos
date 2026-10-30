@@ -287,25 +287,6 @@ export struct NovelShelfView {
     }
   }
 
-  private async importDemo(): Promise<void> {
-    if (this.importing) {
-      return;
-    }
-    this.resetProgress();
-    this.importing = true;
-    try {
-      const novel = await NovelImportService.importDemoNovel((p: NovelImportProgress) => {
-        this.emitProgress(p);
-      });
-      this.showHint('已导入示例小说《' + novel.name + '》，点击开始阅读');
-      await this.refresh();
-      this.notifyShelfDirty();
-    } catch (e) {
-      this.showHint('示例小说导入失败：' + e);
-    }
-    this.importing = false;
-  }
-
   private async pickFiles(): Promise<void> {
     if (this.importing) {
       return;
@@ -512,16 +493,6 @@ export struct NovelShelfView {
       })
       Column({ space: 8 }) {
         Row({ space: 10 }) {
-          Button('导入示例小说')
-            .fontSize(ThemeTokens.FONT_CAPTION)
-            .fontColor(ThemeTokens.WHITE)
-            .backgroundColor(ThemeTokens.PRIMARY)
-            .borderRadius(18)
-            .height(36)
-            .padding({ left: 16, right: 16 })
-            .onClick(() => {
-              this.importDemo();
-            })
           Button('导入文件')
             .fontSize(ThemeTokens.FONT_CAPTION)
             .fontColor(ThemeTokens.TEXT_PRIMARY)

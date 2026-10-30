@@ -45,7 +45,8 @@ export class OcrModelService {
       'https://cdn.jsdelivr.net/gh/xujunjiex/StarFlow@master/app/src/main/assets/ppocrv6/det_v6_small.onnx',
       9_500_000, '文本行/气泡检测，上游 ppocrv6 det_v6_small.onnx'));
     out.push(new OcrModelInfo(OcrModelService.REC_KEY, 'PP-OCRv6 识别模型', 'ppocrv6_rec_v6_small.onnx',
-      OcrModelService.BASE + '/rec_v6_small.onnx', 20_000_000, '日/中/英文字识别，上游 ppocrv6 rec_v6_small.onnx'));
+      'https://raw.githack.com/xujunjiex/StarFlow/master/app/src/main/assets/ppocrv6/rec_v6_small.onnx',
+      20_000_000, '日/中/英文字识别，上游 ppocrv6 rec_v6_small.onnx'));
     return out;
   }
 

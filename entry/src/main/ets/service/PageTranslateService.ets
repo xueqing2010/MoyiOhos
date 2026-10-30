@@ -72,22 +72,35 @@ export class PageTranslateService {
       const translator: Translator = AppEnv.getInstance().engineRegistry.get(engineType);
 
       const translations: Array<string> = [];
+      for (let i = 0; i < regions.length; i++) {
+        translations.push('');
+      }
       let failed = 0;
       let firstError = '';
-      // 页内行级请求串行（plan D6，MVP 可靠性优先）。
-      for (const region of regions) {
-        try {
-          const req: TranslateRequest = { text: region.text, from: 'auto', to: 'zh' };
-          const translated = await translator.translate(req);
-          translations.push(translated);
-        } catch (e) {
-          failed++;
-          if (firstError.length === 0) {
-            firstError = PageTranslateService.readableError(e);
+      // 页内行级并发：网络引擎 4 路并行，本地 llama 保持串行（避免 NAPI 重入）。
+      const concurrency = engineType === EngineType.LOCAL_LLAMA ? 1 : 4;
+      let cursor = 0;
+      const worker = async (): Promise<void> => {
+        while (cursor < regions.length) {
+          const idx = cursor++;
+          const region = regions[idx];
+          try {
+            const req: TranslateRequest = { text: region.text, from: 'auto', to: 'zh' };
+            const translated = await translator.translate(req);
+            translations[idx] = translated;
+          } catch (e) {
+            failed++;
+            if (firstError.length === 0) {
+              firstError = PageTranslateService.readableError(e);
+            }
           }
-          translations.push('');
         }
+      };
+      const workers: Array<Promise<void>> = [];
+      for (let i = 0; i < concurrency; i++) {
+        workers.push(worker());
       }
+      await Promise.all(workers);
 
       const pt = makePageTranslation(pageId);
       pt.engineType = engineType as number;

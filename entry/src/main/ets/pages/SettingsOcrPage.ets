@@ -1,9 +1,6 @@
 import { uiMaterial } from '@kit.ArkUI';
 import { ThemeTokens, WindowSizeClass, observeBreakpoint, Log } from 'commons';
-import fs from '@ohos.file.fs';
-import { util } from '@kit.ArkTS';
 import { OcrService } from 'coreocr';
-import { AppEnv } from '../common/AppEnv';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { OcrModelInfo, OcrModelService } from '../service/OcrModelService';
 
@@ -83,8 +80,6 @@ export struct SettingsOcrPage {
   @State recReady: boolean = false;
   @State downloadingKey: string = '';
   @State modelPercent: number = 0;
-  @State localTesting: boolean = false;
-  @State localTestResult: string = '';
   private dictText: string = '';
   private models: Array<OcrModelInfo> = OcrModelService.list();
   private stopBreakpoint: (() => void) | undefined = undefined;
@@ -129,7 +124,7 @@ export struct SettingsOcrPage {
       new OcrTier('system', '系统 Core Vision Kit', 'HarmonyOS 官方文字识别（textRecognition），本机离线推理。', true),
       new OcrTier('local', '本地 PP-OCRv6（ONNX）',
         ready ? '模型已就绪：ONNX Runtime 本机推理，选择后翻译页使用本地 OCR。'
-          : '请先下载检测与识别模型；下载完成后本档位自动可用。', ready),
+          : '点击任一模型按钮会自动下载 det + rec 并启用本地 OCR。', ready),
       new OcrTier('cloud', '云端 OCR 服务', '需要第三方账号与网络上传，与本地优先的隐私策略冲突，未接入。', false)
     ];
   }
@@ -138,18 +133,35 @@ export struct SettingsOcrPage {
     return info.key === OcrModelService.DET_KEY ? this.detReady : this.recReady;
   }
 
+  /** 点任一模型下载：自动依次下载 det + rec，完成后直接启用本地档位。 */
   private async downloadModel(info: OcrModelInfo): Promise<void> {
+    await this.downloadAll();
+  }
+
+  private async downloadAll(): Promise<void> {
     if (this.downloadingKey.length > 0) {
       return;
     }
-    this.downloadingKey = info.key;
-    this.modelPercent = 0;
     try {
-      await OcrModelService.download(info, (pct: number) => {
-        this.modelPercent = pct;
-      });
+      for (let i = 0; i < this.models.length; i++) {
+        const info = this.models[i];
+        if (this.isReady(info)) {
+          continue;
+        }
+        this.downloadingKey = info.key;
+        this.modelPercent = 0;
+        await OcrModelService.download(info, (pct: number) => {
+          this.modelPercent = pct;
+        });
+      }
       this.refreshModels();
-      this.flash(`${info.name} 下载完成`);
+      if (this.detReady && this.recReady) {
+        await SettingsRepository.set(SettingsKeys.OCR_ENGINE_TIER, 'local');
+        this.ocrTier = 'local';
+        this.flash('det + rec 已下载并启用本地 OCR');
+      } else {
+        this.flash('模型下载完成');
+      }
     } catch (e) {
       const msg = `${e}`;
       this.flash(msg.indexOf('超时') >= 0 || msg.indexOf('网络') >= 0
@@ -214,55 +226,16 @@ export struct SettingsOcrPage {
 
   private async pickTier(tier: OcrTier): Promise<void> {
     if (!tier.available) {
-      this.flash(tier.id === 'local' ? '请先下载 det 与 rec 模型' : '该档位当前版本未接入');
+      if (tier.id === 'local') {
+        await this.downloadAll();
+        return;
+      }
+      this.flash('该档位当前版本未接入');
       return;
     }
     this.ocrTier = tier.id;
     await SettingsRepository.set(SettingsKeys.OCR_ENGINE_TIER, tier.id);
     this.flash(tier.id === 'local' ? '已启用本地 OCR（翻译时生效）' : 'OCR 引擎档位已保存');
-  }
-
-  /** 自测：用 rawfile 示例页跑本地 det+rec，验证 ONNX 推理链路。 */
-  private async testLocal(): Promise<void> {
-    if (this.localTesting) {
-      return;
-    }
-    if (!this.detReady || !this.recReady) {
-      this.flash('请先下载检测与识别模型');
-      return;
-    }
-    this.localTesting = true;
-    this.localTestResult = '加载模型并推理中…';
-    try {
-      const ctx = AppEnv.getInstance().getContext();
-      if (this.dictText.length === 0) {
-        const dictBytes = await ctx.resourceManager.getRawFileContent('ppocrv6_dict.txt');
-        this.dictText = util.TextDecoder.create('utf-8').decodeToString(dictBytes);
-      }
-      const service = OcrService.getInstance();
-      service.configureLocal(OcrModelService.path(this.models[0]), OcrModelService.path(this.models[1]),
-        this.dictText);
-      const png = await ctx.resourceManager.getRawFileContent('demo/manga/page_01.png');
-      const temp = ctx.cacheDir + '/ocr-selftest.png';
-      const file = fs.openSync(temp, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
-      try {
-        fs.writeSync(file.fd, png.buffer);
-      } finally {
-        fs.closeSync(file);
-      }
-      const t0 = Date.now();
-      const regions = await service.recognizeLocal(temp);
-      const ms = Date.now() - t0;
-      let sample = '';
-      for (let i = 0; i < regions.length && i < 3; i++) {
-        sample += regions[i].text + (i < 2 ? ' / ' : '');
-      }
-      this.localTestResult = '本地 OCR 完成：' + regions.length + ' 行，' + ms + ' ms' +
-        (sample.length > 0 ? ' · ' + sample : '');
-    } catch (e) {
-      this.localTestResult = '本地 OCR 失败：' + (e instanceof Error ? e.message : String(e));
-    }
-    this.localTesting = false;
   }
 
   private flash(text: string): void {
@@ -445,25 +418,6 @@ export struct SettingsOcrPage {
               ForEach(this.models, (info: OcrModelInfo) => {
                 this.modelRow(info)
               }, (info: OcrModelInfo) => info.key)
-              Button(this.localTesting ? '本地推理中…' : '本地模型自测')
-                .width('100%')
-                .height(36)
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.PRIMARY)
-                .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-                .borderRadius(ThemeTokens.RADIUS_PILL)
-                .margin({ top: 6 })
-                .enabled(!this.localTesting && this.detReady && this.recReady)
-                .onClick(() => {
-                  this.testLocal();
-                })
-              if (this.localTestResult.length > 0) {
-                Text(this.localTestResult)
-                  .fontSize(ThemeTokens.FONT_SMALL)
-                  .fontColor(this.localTestResult.startsWith('本地 OCR 完成') ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_HINT)
-                  .width('100%')
-                  .lineHeight(17)
-              }
               Text('模型来自上游 StarFlow（LGPL-3.0）的 ppocrv6 assets；字典随包分发，首次加载模型约需数秒。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)

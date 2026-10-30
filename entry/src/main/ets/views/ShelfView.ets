@@ -9,7 +9,6 @@ import { Routes, makeImportWizardParams, makeReaderParams } from '../common/Rout
 import { ImportSheet } from './ImportSheet';
 import { MangaCoverCard } from '../components/MangaCoverCard';
 import { NovelShelfView } from '../novel/NovelShelfView';
-import { DemoDataResult, DemoDataService } from '../service/DemoDataService';
 import { ExportMode, ExportResult } from '../service/ExportService';
 import { ImportService } from '../service/ImportService';
 import { Motion } from '../common/Motion';
@@ -49,7 +48,6 @@ export struct ShelfView {
   @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
   @State areaWidth: number = 360;
   @State refreshingDirs: boolean = false;
-  @State demoBusy: boolean = false;
   /** 拖入导入：文件管理器拖拽悬停时显示投放遮罩。 */
   @State dragActive: boolean = false;
 
@@ -490,20 +488,6 @@ export struct ShelfView {
     this.refreshingDirs = false;
   }
 
-  private async generateDemo(): Promise<void> {
-    if (this.demoBusy) {
-      return;
-    }
-    this.demoBusy = true;
-    try {
-      const result: DemoDataResult = await DemoDataService.generateSampleManga();
-      await this.refresh();
-      this.showHint(result.message);
-    } catch (e) {
-      this.showHint(`${e}`);
-    }
-    this.demoBusy = false;
-  }
 
   /** 进入阅读器（从上次阅读页继续）。 */
   private openReader(d: MangaDisplay): void {
@@ -789,7 +773,7 @@ export struct ShelfView {
           icon: Artwork.EMPTY_SHELF,
           iconSize: 150,
           title: $r('app.string.empty_shelf_title'),
-          hint: '支持 zip/cbz、图片目录与相册导入；也可先生成示例漫画体验完整流程'
+          hint: '支持 zip/cbz、图片目录与相册导入'
         })
       }
       .width('100%')
@@ -806,33 +790,6 @@ export struct ShelfView {
           .onClick(() => {
             this.showImportSheet = true;
           })
-        Button() {
-          Row({ space: 6 }) {
-            if (this.demoBusy) {
-              LoadingProgress()
-                .width(16)
-                .height(16)
-                .color(ThemeTokens.PRIMARY_SOFT)
-            } else {
-              Image(Artwork.ICON_DEMO)
-                .width(15)
-                .height(15)
-                .fillColor(ThemeTokens.PRIMARY_SOFT)
-            }
-            Text('生成示例漫画')
-              .fontSize(ThemeTokens.FONT_CAPTION)
-              .fontColor(ThemeTokens.PRIMARY_SOFT)
-          }
-        }
-        .height(40)
-        .padding({ left: 18, right: 18 })
-        .borderRadius(ThemeTokens.RADIUS_PILL)
-        .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-        .borderWidth(1)
-        .borderColor('#4DA78BFA')
-        .onClick(() => {
-          this.generateDemo();
-        })
       }
       .margin({ top: 8, bottom: this.sizeClass === WindowSizeClass.SM ? 100 : 24 })
     }

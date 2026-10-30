@@ -85,7 +85,7 @@ export struct SettingsReadingPage {
   @State pageMargin: number = 8;
   @State autoInterval: number = 5;
   @State whiteMerge: boolean = true;
-  @State preTranslate: boolean = true;
+  @State preTranslate: boolean = false;
   @State novelLineHeight: number = 30;
   @State novelMargin: number = 18;
   @State novelDisplayMode: number = 1;
@@ -139,7 +139,7 @@ export struct SettingsReadingPage {
     this.pageMargin = s.margin;
     this.autoInterval = s.autoInterval;
     this.whiteMerge = s.whiteMerge;
-    this.preTranslate = await SettingsRepository.getBool(SettingsKeys.PRETRANSLATE_ENABLED, true);
+    this.preTranslate = await SettingsRepository.getBool(SettingsKeys.PRETRANSLATE_ENABLED, false);
     this.novelLineHeight = await SettingsRepository.getNumber(SettingsKeys.NOVEL_LINE_HEIGHT, 30);
     this.novelMargin = await SettingsRepository.getNumber(SettingsKeys.NOVEL_MARGIN, 18);
     this.novelDisplayMode = await SettingsRepository.getNumber(SettingsKeys.NOVEL_DISPLAY_MODE, 1);
