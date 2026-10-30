@@ -138,4 +138,9 @@ hdc -t <serial> shell hilog -x | grep -iE 'Account|clientId|profile|100150'
   devecocli run --module entry --device 2BD0223929003920 --skip-build
   ```
 
-- 下一步：真机解锁后打开「我的 → 华为账号登录」，确认能拉起授权页；若仍报 `Invalid clientId or profile`，在 AGC 检查 Profile 是否为同一应用、证书 SHA-256 是否已加入应用，并把 `AppScope/app.json5` 的 `versionCode` +1 后重装。
+- **华为账号登录已通过真机验证**：PCE-W30 上显示「已登录华为账号」，可执行云备份 / 云恢复与退出账号。
+- **云同步暂阻塞**：点击云备份返回 `404 Product does not exist`，原因是尚未在 AGC 开通云存储实例。
+  - 官方路径：AGC → 项目 → **云开发（Serverless） → 云存储 → 立即开通**，创建存储实例；
+  - 但当前 AGC 首页提示「关于云开发服务停止新开发者接入的公告」，新账号可能无法再开通；需申请白名单或使用已有云开发项目。
+  - 未开通前，Cloud Storage 的 bucket 不存在，任何上传都会 404；这不是客户端代码错误。
+- 若仍报 `Invalid clientId or profile`，在 AGC 检查 Profile 是否为同一应用、证书 SHA-256 是否已加入应用，并把 `AppScope/app.json5` 的 `versionCode` +1 后重装。

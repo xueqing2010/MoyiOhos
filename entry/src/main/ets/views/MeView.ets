@@ -221,7 +221,7 @@ export struct MeView {
       }
 
       Text(this.accountHint.length > 0 ? this.accountHint
-        : '云同步保存书架索引、阅读进度与偏好；需 AGC 开通云存储与正式签名。模拟器可能无法加载系统登录面板。')
+        : '云同步保存书架索引、阅读进度与偏好；需 AGC 开通云存储实例并使用匹配的签名 Profile。')
         .fontSize(ThemeTokens.FONT_SMALL)
         .fontColor(ThemeTokens.TEXT_HINT)
         .width('100%')

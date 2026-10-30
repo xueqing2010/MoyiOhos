@@ -31,6 +31,11 @@
 </p>
 <p align="center"><b>模型管理 / 翻译历史</b></p>
 
+<p align="center">
+  <img src="docs/images/huawei-account-login.jpg" width="720" alt="真机华为账号已登录" />
+</p>
+<p align="center"><b>真机 PCE-W30：华为账号已登录，可执行云备份 / 云恢复</b></p>
+
 > 截图来自 HarmonyOS 7.0.0（API 26）手机模拟器、平板模拟器与 PCE-W30 真机；详细测试记录见 [docs/TESTING.md](docs/TESTING.md)。
 
 ## 主要能力

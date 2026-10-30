@@ -130,7 +130,7 @@ export class CloudSyncService {
     } catch (e) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
       Log.warn(TAG, 'cloud upload failed: ' + msg);
-      throw new Error('云同步不可用：请在 AGC 开通云存储并使用匹配签名的正式应用（' + msg + '）');
+      throw new Error('云同步不可用：请先在 AGC 云开发（Serverless）→ 云存储创建存储实例，并确认签名与应用匹配（' + msg + '）');
     }
     await SettingsRepository.set(SettingsKeys.CLOUD_SYNC_LAST, Date.now());
     const info: CloudBackupInfo = { mangas: mangas.length, novels: novels.length, savedAt: Date.now() };

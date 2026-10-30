@@ -26,6 +26,8 @@
 - 使用 `devecocli auth login` + `devecocli signature generate` 自动生成调试证书与 Profile，并写入 `build-profile.json5`。
 - 移除受限 ACL 权限 `ohos.permission.FILE_ACCESS_PERSIST`，解除自动签名阻塞；文件导入改由系统文件选择器完成。
 - 真机可安装，模拟器启动验证通过；真机启动需先解锁屏幕（开发者模式下 CLI 不能自动解锁）。
+- **真机华为账号登录验证通过**：PCE-W30 显示「已登录华为账号」，云备份/云恢复入口可用；新增截图 `docs/images/huawei-account-login.jpg`。
+- 华为云同步仍阻塞：AGC 云存储未开通，上传返回 `404 Product does not exist`；且 AGC 提示云开发服务停止新开发者接入，需要白名单或已有云开发项目。
 
 ### 文档
 
