@@ -18,7 +18,7 @@
 | 模型管理存储统计 | 通过 | 修复 mkdir EEXIST 后显示 284.9MB，包含模型与缓存分片 |
 | 蓝白 / 蓝黑主题 | 通过 | 旧紫色值自动迁移到蓝白 |
 | 五栏切换 | 通过 | 书架 / 导入 / 翻译 / 历史 / 我的无崩溃 |
-| 华为账号 / 云同步 | 受配置限制 | 真机返回 Invalid clientId/profile；需 AGC 正式签名与 clientId |
+| 华为账号 / 云同步 | 待登录验证 | AGC 应用与调试签名已生成；真机可安装，启动需先解锁屏幕；登录需在解锁后点「我的 → 华为账号」完成 |
 
 ## 性能记录
 
@@ -31,15 +31,16 @@
 
 ```bash
 cd StarFlowOhos
-devecocli build --build-mode debug
-hdc -t <serial> install -r entry/build/default/outputs/default/entry-default-signed.hap
-hdc -t <serial> shell aa force-stop com.moe.starflow
-hdc -t <serial> shell aa start -a EntryAbility -b com.moe.starflow
+devecocli signature generate --force   # 仅首次/换证书时
+devecocli build --modules entry --build-mode debug
+devecocli device unlock --device 2BD0223929003920
+devecocli run --module entry --device 2BD0223929003920 --skip-build
 ```
 
 ## 已知限制
 
-- **华为账号登录**：调试签名未在 AGC 绑定应用，Account Kit 返回 Invalid clientId/profile；正式发布需 AGC 应用与正式签名。
+- **华为账号登录**：AGC 应用「星译 StarFlow」已创建，调试证书/Profile 已由 devecocli 生成并写入 `build-profile.json5`；真机解锁后需点击「我的 → 华为账号」实际授权验证一次。
+- **真机启动**：开发者模式下 CLI 无法自动解锁屏幕，必须先手动解锁或在解锁态运行；锁屏时 `aa start` 返回 10106102。
 - **云同步**：依赖 AGC Cloud Foundation Kit 开通云存储。
 - **2in1 模拟器**：当前环境 MateBook Pro 模拟器启动失败，2in1 窗口缩放/拖拽未完成真机回归。
 - **EPUB picker**：部分系统 UIExtension 环境限制文件选择器，建议真机验证。

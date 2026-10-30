@@ -20,6 +20,13 @@
 - 左侧五栏使用沉浸材质与切换过渡；Tabs 内容切换动画 320ms。
 - 移除快捷验证工作台、示例数据生成、OCR 自测等开发测试入口。
 
+### 华为账号 / 签名
+
+- 在 AGC 创建「星译 StarFlow」应用（`com.moe.starflow`，APP ID / Client ID 均为 `6917620459514246462`），开启华为账号开放能力。
+- 使用 `devecocli auth login` + `devecocli signature generate` 自动生成调试证书与 Profile，并写入 `build-profile.json5`。
+- 移除受限 ACL 权限 `ohos.permission.FILE_ACCESS_PERSIST`，解除自动签名阻塞；文件导入改由系统文件选择器完成。
+- 真机可安装，模拟器启动验证通过；真机启动需先解锁屏幕（开发者模式下 CLI 不能自动解锁）。
+
 ### 文档
 
 - README 增加真机/模拟器演示截图。

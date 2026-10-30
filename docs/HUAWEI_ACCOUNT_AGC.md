@@ -117,9 +117,25 @@ hdc -t <serial> shell hilog -x | grep -iE 'Account|clientId|profile|100150'
 
 ## 6. 本仓库当前状态
 
-- 仓库内没有 `client_id` metadata；
-- 没有 AGC 应用绑定；
-- 当前安装包使用本地/调试签名；
-- 因此真实华为账号登录会返回 `Invalid clientId or profile`，这属于配置缺失，不是 Account Kit 调用代码错误。
+- AGC 应用已创建：**星译 StarFlow**，包名 **`com.moe.starflow`**；
+- **APP ID / Client ID 相同**：`6917620459514246462`（按华为官方说明，此时**不需要**在 `module.json5` 追加 `client_id` metadata）；
+- 已在 AGC 打开 **华为账号** 开放能力；
+- 已通过 CLI 完成登录并自动生成调试签名材料：
 
-补齐上述 AGC 配置并把 Client ID / 签名材料提供后，即可在真机完成登录与云同步闭环。
+  ```bash
+  devecocli auth login --no-prompt
+  cd /Users/kong/Desktop/StarFlowOhos
+  devecocli signature generate --force
+  devecocli build --modules entry --build-mode debug
+  ```
+
+  生成后在根目录 `build-profile.json5` 的 `app.signingConfigs[0].material` 中看到 `.p12 / .cer / .p7b` 路径，签名材料位于 `~/.ohos/config/`。
+- 已移除 `ohos.permission.FILE_ACCESS_PERSIST`：该权限属于**受限 ACL 权限**，会阻止自动签名；当前阅读/导入流程使用系统文件选择器，不需要该权限。若后续确实需要持久化文件访问，应在 AGC **ACL 权限** 中申请，而不是直接写回 `module.json5`。
+- 构建与安装已验证：真机 `2BD0223929003920` 可安装；模拟器 `127.0.0.1:5555` 启动 **Smoke: PASS**。
+- 真机启动仍需**先解锁屏幕**；开发者模式下 CLI 不能自动解锁。解锁后执行：
+
+  ```bash
+  devecocli run --module entry --device 2BD0223929003920 --skip-build
+  ```
+
+- 下一步：真机解锁后打开「我的 → 华为账号登录」，确认能拉起授权页；若仍报 `Invalid clientId or profile`，在 AGC 检查 Profile 是否为同一应用、证书 SHA-256 是否已加入应用，并把 `AppScope/app.json5` 的 `versionCode` +1 后重装。
