@@ -158,6 +158,7 @@ export struct SettingsOcrPage {
       if (this.detReady && this.recReady) {
         await SettingsRepository.set(SettingsKeys.OCR_ENGINE_TIER, 'local');
         this.ocrTier = 'local';
+        this.refreshModels();
         this.flash('det + rec 已下载并启用本地 OCR');
       } else {
         this.flash('模型下载完成');
