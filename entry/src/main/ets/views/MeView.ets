@@ -85,7 +85,7 @@ export struct MeView {
         this.loginController.onClickLoginWithHuaweiIDButton(
           (err: BusinessError, cred: loginComponentManager.HuaweiIDCredential) => {
             if (err) {
-              this.accountHint = '登录未完成：' + err.message;
+              this.accountHint = MeView.loginError(err);
               return;
             }
             AccountService.saveLogin(cred.openID, cred.unionID).then(() => {
@@ -101,6 +101,17 @@ export struct MeView {
       }
     }
     this.refreshAccount();
+  }
+
+  private static loginError(err: BusinessError): string {
+    const msg = err.message !== undefined ? err.message : '';
+    if (msg.indexOf('clientId') >= 0 || msg.indexOf('profile') >= 0) {
+      return '华为账号登录未配置：当前安装包签名未在 AGC 绑定应用，需正式签名并配置 clientId 后重试。';
+    }
+    if (msg.length > 0) {
+      return '登录未完成：' + msg;
+    }
+    return '登录未完成，请稍后重试';
   }
 
   private async refreshAccount(): Promise<void> {

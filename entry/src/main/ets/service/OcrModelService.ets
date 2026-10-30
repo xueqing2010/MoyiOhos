@@ -34,13 +34,16 @@ export class OcrModelInfo {
 export class OcrModelService {
   static readonly DET_KEY: string = 'OCR_PP_DET_V6';
   static readonly REC_KEY: string = 'OCR_PP_REC_V6';
+  // 国内真机直连 raw.githubusercontent.com 常被阻断；使用公共 GitHub 加速前缀。
   private static readonly BASE: string =
-    'https://raw.githubusercontent.com/xujunjiex/StarFlow/master/app/src/main/assets/ppocrv6';
+    'https://ghproxy.net/https://raw.githubusercontent.com/xujunjiex/StarFlow/master/app/src/main/assets/ppocrv6';
 
   static list(): Array<OcrModelInfo> {
     const out: Array<OcrModelInfo> = [];
+    // det 9.5MB 走 jsDelivr（国内可达且速度快）；rec 21.2MB 超过 jsDelivr 单文件上限，走 ghproxy。
     out.push(new OcrModelInfo(OcrModelService.DET_KEY, 'PP-OCRv6 检测模型', 'ppocrv6_det_v6_small.onnx',
-      OcrModelService.BASE + '/det_v6_small.onnx', 9_500_000, '文本行/气泡检测，上游 ppocrv6 det_v6_small.onnx'));
+      'https://cdn.jsdelivr.net/gh/xujunjiex/StarFlow@master/app/src/main/assets/ppocrv6/det_v6_small.onnx',
+      9_500_000, '文本行/气泡检测，上游 ppocrv6 det_v6_small.onnx'));
     out.push(new OcrModelInfo(OcrModelService.REC_KEY, 'PP-OCRv6 识别模型', 'ppocrv6_rec_v6_small.onnx',
       OcrModelService.BASE + '/rec_v6_small.onnx', 20_000_000, '日/中/英文字识别，上游 ppocrv6 rec_v6_small.onnx'));
     return out;

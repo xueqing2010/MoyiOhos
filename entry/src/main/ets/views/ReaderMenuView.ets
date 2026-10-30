@@ -267,7 +267,7 @@ export struct ReaderMenuView {
           ThemeTokens.PRIMARY, () => {
             this.onTranslatePage();
           })
-        this.actionButton($r('app.media.ic_reader_batch'), this.batchRunning ? '批量中' : '批量翻译',
+        this.actionButton($r('app.media.ic_reader_batch'), this.batchRunning ? '翻译中' : '整本翻译',
           this.ocrAvailable, ThemeTokens.ACCENT, () => {
             this.onBatch();
           })
