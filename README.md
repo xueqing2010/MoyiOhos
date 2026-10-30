@@ -100,14 +100,18 @@ hvigorw assembleHap --mode module -p product=default
 
 ## 签名说明
 
-本仓库**不包含任何签名材料**：`build-profile.json5` 中的 `signingConfigs` 已清空。首次克隆后需在 DevEco Studio 的
-`File → Project Structure → Signing Configs` 中重新配置自动签名（或导入自己的 `.p12` / `.p7b`）。
-
-若你希望本地签名改动不被提交，可使用：
+当前 `build-profile.json5` 已用 CLI 生成的调试签名（`.p12/.cer/.p7b`，位于 `~/.ohos/config/`）。首次克隆或换机后执行：
 
 ```bash
-git update-index --skip-worktree build-profile.json5
+devecocli auth login --no-prompt
+cd /Users/kong/Desktop/StarFlowOhos
+devecocli signature generate --force
 ```
+
+签名配置会写入根目录 `build-profile.json5`。如果换过签名，设备上的旧包必须卸载一次，否则会报
+`9568332 install sign info inconsistent`。
+
+> 不要把 `.p12/.p7b/.cer`、密码或 AGC Client Secret 提交到仓库。
 
 ## 第三方组件与许可
 
@@ -123,6 +127,7 @@ git update-index --skip-worktree build-profile.json5
 - [docs/TESTING.md](docs/TESTING.md)：真机/模拟器测试记录、性能数据与已知限制
 - [docs/HUAWEI_ACCOUNT_AGC.md](docs/HUAWEI_ACCOUNT_AGC.md)：华为账号登录 / AGC Client ID / 签名指纹 / 云同步配置指南
 - [docs/images](docs/images/)：演示截图索引
+- [skills/harmonyos-arkts-app-dev](skills/harmonyos-arkts-app-dev/)：本项目的全流程开发 skill 与坑位复盘
 - [CHANGELOG.md](CHANGELOG.md)：版本变更记录
 
 ## 许可证
