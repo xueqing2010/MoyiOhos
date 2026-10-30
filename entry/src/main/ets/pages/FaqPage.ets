@@ -159,7 +159,7 @@ export struct FaqPage {
             .borderRadius(ThemeTokens.RADIUS_CARD)
             .backgroundColor(ThemeTokens.CARD_BG)
 
-            Text('没有找到答案？可在「尖刀验证工作台」查看各技术点的最近验证结果，或到上游开源项目提交 issue。')
+            Text('没有找到答案？可到上游开源项目提交 issue，或在应用内「我的 → 关于星译」查看构建与版本信息。')
               .fontSize(ThemeTokens.FONT_SMALL)
               .fontColor(ThemeTokens.TEXT_TERTIARY)
               .width('100%')

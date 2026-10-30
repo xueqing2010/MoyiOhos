@@ -3,6 +3,7 @@ import { common } from '@kit.AbilityKit';
 import {
   ThemeTokens,
   WindowSizeClass,
+  Log,
   sizeClassOfWidth,
   startBreakpointObserver,
   observeBreakpoint,
@@ -50,6 +51,7 @@ import { TextHistoryPage } from '../pages/TextHistoryPage';
 @Component
 struct Index {
   @State currentTab: number = 0;
+  @State statusBarVp: number = 0;
   @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
   /** 主题版本：蓝白/蓝黑切换后 +1，用 key 重建整个 shell 让所有页面重读色板。 */
   @StorageLink('starflow_theme_rev') @Watch('onThemeRev') themeRev: number = 0;
@@ -59,6 +61,15 @@ struct Index {
   private stopBreakpoint: (() => void) | undefined = undefined;
 
   aboutToAppear(): void {
+    try {
+      window.getLastWindow(getContext(this)).then((win: window.Window) => {
+        const area = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+        this.statusBarVp = px2vp(area.topRect.height);
+      }).catch(() => {
+      });
+    } catch (e) {
+      Log.warn('Index', 'status bar measure failed: ' + e);
+    }
     this.immersiveSupported = uiMaterial.isImmersiveMaterialSupported();
     // 先加载持久化主题；应用色板后递增版本强制重建 shell。
     SettingsRepository.getString(SettingsKeys.THEME_MODE, 'blue').then((saved: string) => {
@@ -304,7 +315,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .padding({ bottom: 68 })
+    .padding({ bottom: 0 })
     .backgroundColor(ThemeTokens.SURFACE)
     // 主题切换时强制重建每个 Tab 内容，避免 Tabs 缓存旧色板。
     .key('tab-' + index + '-' + this.themeRev)
@@ -352,7 +363,7 @@ struct Index {
     .barOverlap(true)
     .barPosition(BarPosition.End)
     .barFloatingStyle({
-      barBottomMargin: 8,
+      barBottomMargin: 0,
       adaptToHandedness: true,
       // 官方推荐：悬浮 Tab 使用 ULTRA_THIN 材质；自定义 tabBar 不使用 colorInvert
       // （反色只对 BottomTabBarStyle + 系统颜色资源生效，直接开会让材质发白）。
@@ -489,6 +500,7 @@ struct Index {
     .mode(NavigationMode.Stack)
     .navDestination(this.pageDestination)
     .backgroundColor(ThemeTokens.SURFACE)
+    .padding({ top: this.statusBarVp })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')

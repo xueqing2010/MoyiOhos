@@ -73,6 +73,9 @@ export default class EntryAbility extends UIAbility {
   private configureWindow(windowStage: window.WindowStage): void {
     try {
       const mainWindow: window.Window = windowStage.getMainWindowSync();
+      mainWindow.setWindowLayoutFullScreen(true).catch((e: BusinessError) => {
+        Log.warn('EntryAbility', `setWindowLayoutFullScreen failed: ${e.message}`);
+      });
       mainWindow.setWindowBackgroundColor(ThemeTokens.SURFACE);
       mainWindow.setWindowSystemBarProperties({
         statusBarColor: ThemeTokens.SURFACE,
