@@ -4,7 +4,9 @@ import { AppEnv } from '../common/AppEnv';
 import { Routes } from '../common/Routes';
 import { SettingsKeys, SettingsRepository, TranslateSettings } from '../data/SettingsRepository';
 import { EnginePresets } from 'coretranslate';
+import { picker } from '@kit.CoreFileKit';
 import { TextTranslateViewModel } from '../viewmodel/TextTranslateViewModel';
+import { GlossaryService } from '../service/GlossaryService';
 
 /** 单选选项。 */
 class Choice {
@@ -81,6 +83,7 @@ export struct SettingsTranslatePage {
   @State promptDraft: string = '';
   @State savedPrompt: string = '';
   @State hint: string = '';
+  @State glossaryCount: number = 0;
   @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
   private navStack: NavPathStack = AppEnv.getInstance().navStack;
   private stopBreakpoint: (() => void) | undefined = undefined;
@@ -153,6 +156,8 @@ export struct SettingsTranslatePage {
     this.contextTurns = s.contextTurns;
     this.thinkingMode = s.thinkingMode;
     this.temperature = s.temperature;
+    await GlossaryService.load();
+    this.glossaryCount = GlossaryService.count();
     await this.loadPrompt();
   }
 
@@ -319,6 +324,31 @@ export struct SettingsTranslatePage {
     .alignItems(HorizontalAlign.Start)
   }
 
+  private async importGlossary(): Promise<void> {
+    try {
+      const docPicker = new picker.DocumentViewPicker();
+      const opts = new picker.DocumentSelectOptions();
+      opts.maxSelectNumber = 1;
+      opts.fileSuffixFilters = ['术语表 JSON|.json'];
+      opts.selectMode = picker.DocumentSelectMode.FILE;
+      const uris = await docPicker.select(opts);
+      if (uris.length === 0) {
+        return;
+      }
+      const count = await GlossaryService.importFromUri(uris[0]);
+      this.glossaryCount = count;
+      this.hint = '术语表已导入：' + count + ' 条';
+    } catch (e) {
+      this.hint = '导入术语表失败：' + e;
+    }
+  }
+
+  private async clearGlossary(): Promise<void> {
+    await GlossaryService.clear();
+    this.glossaryCount = 0;
+    this.hint = '术语表已清空';
+  }
+
   build() {
     NavDestination() {
       Scroll() {
@@ -409,6 +439,37 @@ export struct SettingsTranslatePage {
                     this.pickSource(opt.value);
                   } })
                 }, (opt: Choice) => opt.value)
+              }
+              .width('100%')
+            }
+
+            this.sectionTitle('术语表', '导入 JSON 数组 [{"s":"原文","t":"译文"}]，翻译前按最长优先替换')
+            TranslateSettingCard() {
+              Row({ space: 8 }) {
+                Text(this.glossaryCount > 0 ? this.glossaryCount + ' 条术语' : '尚未导入')
+                  .fontSize(ThemeTokens.FONT_SMALL)
+                  .fontColor(this.glossaryCount > 0 ? ThemeTokens.SUCCESS : ThemeTokens.TEXT_HINT)
+                  .layoutWeight(1)
+                Button('导入')
+                  .fontSize(ThemeTokens.FONT_SMALL)
+                  .height(30)
+                  .borderRadius(ThemeTokens.RADIUS_PILL)
+                  .backgroundColor(ThemeTokens.PRIMARY)
+                  .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
+                  .onClick(() => {
+                    this.importGlossary();
+                  })
+                if (this.glossaryCount > 0) {
+                  Button('清空')
+                    .fontSize(ThemeTokens.FONT_SMALL)
+                    .height(30)
+                    .borderRadius(ThemeTokens.RADIUS_PILL)
+                    .backgroundColor(ThemeTokens.SURFACE_VARIANT)
+                    .fontColor(ThemeTokens.TEXT_SECONDARY)
+                    .onClick(() => {
+                      this.clearGlossary();
+                    })
+                }
               }
               .width('100%')
             }

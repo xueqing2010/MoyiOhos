@@ -10,6 +10,7 @@ import { AppEnv } from '../common/AppEnv';
 import { PageRepository } from '../data/PageRepository';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { OcrModelService } from './OcrModelService';
+import { GlossaryService } from './GlossaryService';
 
 const TAG = 'PageTranslateService';
 const PREF_FILE = 'starflow_translate';
@@ -96,6 +97,7 @@ export class PageTranslateService {
     }
     const lang = await PageTranslateService.loadOcrLang();
     const targetLang = await PageTranslateService.loadTargetLang();
+    await GlossaryService.load();
     const tStart = Date.now();
     let pixelMap: image.PixelMap | undefined = undefined;
     try {
@@ -130,8 +132,14 @@ export class PageTranslateService {
       const tTrans = Date.now();
       const translateLine = async (idx: number): Promise<void> => {
         const region = regions[idx];
-        const req: TranslateRequest = { text: region.text, from: 'auto', to: targetLang };
-        const key = engineType + '|' + targetLang + '|' + region.text;
+        const source = GlossaryService.preReplace(region.text);
+        const remembered = GlossaryService.lookup(source);
+        if (remembered !== undefined) {
+          translations[idx] = remembered;
+          return;
+        }
+        const req: TranslateRequest = { text: source, from: 'auto', to: targetLang };
+        const key = engineType + '|' + targetLang + '|' + source;
         const cached = PageTranslateService.lineCache.get(key);
         if (cached !== undefined) {
           translations[idx] = cached;
@@ -158,7 +166,7 @@ export class PageTranslateService {
         for (const group of groups) {
           let assigned = false;
           if (group.length > 1) {
-            const text = group.map((idx: number): string => regions[idx].text).join('\n');
+            const text = group.map((idx: number): string => GlossaryService.preReplace(regions[idx].text)).join('\n');
             const key = 'batch|' + engineType + '|' + targetLang + '|' + text;
             try {
               let joined = PageTranslateService.lineCache.get(key);
@@ -239,6 +247,13 @@ export class PageTranslateService {
       PageTranslateService.emitProgress(onProgress, TranslatePhase.SAVING, 98,
         completed, regions.length, '保存译文');
       await PageRepository.saveTranslation(pt);
+      const sources: Array<string> = [];
+      for (const r of regions) {
+        sources.push(r.text);
+      }
+      GlossaryService.rememberPage(sources, translations).catch((e: Object) => {
+        Log.warn(TAG, 'remember translation failed: ' + e);
+      });
       PageTranslateService.emitProgress(onProgress, TranslatePhase.SAVING, 100,
         completed, regions.length, '完成');
       Log.info(TAG, `page ${pageId}: ${regions.length} lines, ${failed} failed`);
