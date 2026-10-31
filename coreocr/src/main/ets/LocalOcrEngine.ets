@@ -52,7 +52,18 @@ export class LocalOcrEngine {
         }
         this.release();
         if (!this.envReady) {
-            OnnxEnvironment.InitEnvironment();
+            try {
+                OnnxEnvironment.InitEnvironment();
+            }
+            catch (e) {
+                const msg = (e as Error).message ?? '';
+                // ONNX Runtime 环境是进程级的；另一个线程初始化过后这里会抛
+                // "already initialized"，此时直接复用即可，不能当成失败。
+                if (msg.indexOf('already initialized') < 0) {
+                    throw new Error(msg.length > 0 ? msg : 'ONNX Runtime 初始化失败');
+                }
+                Log.warn(TAG, 'ORT environment already initialized by another thread');
+            }
             // 张量构造自检：验证 NAPI 环境/分配器已就绪（否则会在构造时空指针）。
             const probe = new OnnxTensor(new ArrayBuffer(12), [3], 0);
             probe.Close();
@@ -120,9 +131,15 @@ export class LocalOcrEngine {
             try {
                 const text = this.recognizeBox(page, box);
                 const trimmed = text.trim();
-                if (trimmed.length > 0) {
-                    regions.push(makeOcrRegion(trimmed, makePixelRect(box.x, box.y, box.w, box.h)));
+                const area = box.w * box.h;
+                const pageArea = page.width * page.height;
+                // 过滤整页大框，以及“单字却占大面积”的伪检测（暗色背景/线稿误检）。
+                if (trimmed.length === 0 || area > pageArea * 0.15
+                    || (trimmed.length <= 2 && area > pageArea * 0.04)) {
+                    Log.warn(TAG, 'skip suspicious box ' + box.w + 'x' + box.h + ' text=' + trimmed);
+                    continue;
                 }
+                regions.push(makeOcrRegion(trimmed, makePixelRect(box.x, box.y, box.w, box.h)));
             }
             catch (e) {
                 Log.warn(TAG, 'rec box failed: ' + JSON.stringify(e));

@@ -73,7 +73,7 @@ export class PageTranslateService {
   static async prewarm(): Promise<void> {
     await AppEnv.ready();
     await PageTranslateService.configureOcr();
-    // 本地 OCR 的 ONNX 会话在 TaskPool worker 内创建；主线程不再重复加载一份。
+    await OcrService.getInstance().prewarmLocal();
     Log.info(TAG, 'OCR prewarm done, local=' + OcrService.getInstance().isLocalEnabled());
   }
 
@@ -109,9 +109,11 @@ export class PageTranslateService {
       }
       PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 15, 0, 0, '识别文字');
       const tOcr = Date.now();
-      const regions: Array<OcrRegion> = localOcr
-        ? await OcrService.getInstance().recognizeLocalAsync(page.imagePath)
-        : await OcrService.getInstance().recognize(pixelMap, lang, page.imagePath);
+      // ONNX Runtime 的环境/会话在 TaskPool 中会与其他 worker 冲突
+      // （Session is closed / OnnxEnvironment already initialized），
+      // 当前版本回到主线程；后续用单一专用 Worker 再迁移。
+      const regions: Array<OcrRegion> = await OcrService.getInstance()
+        .recognize(localOcr ? undefined : pixelMap, lang, page.imagePath);
       const ocrMs = Date.now() - tOcr;
       PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, 35, 0, regions.length,
         '识别完成 ' + regions.length + ' 行');

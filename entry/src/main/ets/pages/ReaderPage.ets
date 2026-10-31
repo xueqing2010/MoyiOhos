@@ -276,6 +276,12 @@ struct ReaderPageLayer {
       if (text.length === 0) {
         continue;
       }
+      // 旧译文里可能残留“整页大框”，不参与绘制/去字，避免覆盖整页。
+      const pageArea = this.pageSize.width * this.pageSize.height;
+      if (region.box.w * region.box.h > pageArea * 0.15
+        || (region.text.length <= 2 && region.box.w * region.box.h > pageArea * 0.04)) {
+        continue;
+      }
       const box: DisplayRect = {
         x: region.box.x,
         y: region.box.y,

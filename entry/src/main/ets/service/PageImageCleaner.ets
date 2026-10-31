@@ -15,7 +15,7 @@ export class PageImageCleaner {
 
   static cleanPath(pageId: number): string {
     const ctx = AppEnv.getInstance().getContext();
-    return ctx.cacheDir + '/clean/page_' + pageId + '_v1.jpg';
+    return ctx.cacheDir + '/clean/page_' + pageId + '_v4.jpg';
   }
 
   static async ensure(pageId: number, imagePath: string,
@@ -73,7 +73,7 @@ export class PageImageCleaner {
       await pm.readPixelsToBuffer(buffer);
       const rgba = new Uint8Array(buffer);
       PageImageCleaner.erase(rgba, w, h, regions);
-      const out = image.createPixelMapSync(rgba, {
+      const out = await image.createPixelMap(buffer, {
         size: { width: w, height: h },
         pixelFormat: image.PixelMapFormat.RGBA_8888,
         alphaType: image.AlphaType.UNPREMUL,
@@ -129,8 +129,14 @@ export class PageImageCleaner {
 
   /** 用框外上下左右四条边的平均色做双线性填充，边缘保留原像素。 */
   private static erase(rgba: Uint8Array, w: number, h: number, regions: Array<OcrRegion>): void {
+    const pageArea = w * h;
     for (const region of regions) {
       const box = region.box;
+      // 与 OCR 侧一致：整页级伪框不参与去字，否则会把半页涂白。
+      if (box.w * box.h > pageArea * 0.15
+        || (region.text.length <= 2 && box.w * box.h > pageArea * 0.04)) {
+        continue;
+      }
       const pad = 2;
       const x0 = Math.max(2, Math.floor(box.x) - pad);
       const y0 = Math.max(2, Math.floor(box.y) - pad);

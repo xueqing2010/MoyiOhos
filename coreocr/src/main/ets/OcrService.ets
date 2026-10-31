@@ -3,9 +3,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { image } from '@kit.ImageKit';
 import { OcrRegion, PixelRect, makeOcrRegion, makePixelRect } from 'coremodel';
 import { Log } from 'commons';
-import { taskpool } from '@kit.ArkTS';
 import { LocalOcrConfig, LocalOcrEngine } from './LocalOcrEngine';
-import { recognizeLocalTask } from './LocalOcrTask';
 
 /**
  * App-level OCR language hint. The system textRecognition engine is
@@ -59,34 +57,6 @@ export class OcrService {
     this.localEnabled = true;
     this.lastProbeDetail = '本地 PP-OCRv6（ONNX Runtime）';
     return await engine.recognize(pagePath);
-  }
-
-  /** 本地 OCR 的 worker 版本：主线程不跑 ONNX，只做结果解码。 */
-  async recognizeLocalAsync(pagePath: string): Promise<Array<OcrRegion>> {
-    const config = this.localConfig;
-    if (config === undefined) {
-      throw new Error('本地模型未配置');
-    }
-    try {
-      const rows = await taskpool.execute(recognizeLocalTask, pagePath,
-        config.detPath, config.recPath, config.dictText) as Array<string>;
-      const out: Array<OcrRegion> = [];
-      for (const row of rows) {
-        const obj = JSON.parse(row) as Record<string, Object>;
-        const text = obj['t'] as string;
-        const x = obj['x'] as number;
-        const y = obj['y'] as number;
-        const w = obj['w'] as number;
-        const h = obj['h'] as number;
-        out.push(makeOcrRegion(text, makePixelRect(x, y, w, h)));
-      }
-      this.lastProbeDetail = '本地 PP-OCRv6（ONNX Runtime / TaskPool）';
-      return out;
-    } catch (e) {
-      // TaskPool 在部分设备/模拟器上不可用：回退主线程，保证本地 OCR 仍可用。
-      Log.warn('OcrService', 'taskpool local OCR failed, fallback main: ' + e);
-      return await this.recognizeLocal(pagePath);
-    }
   }
 
   /** 启动预热本地模型（仅在用户选择 local 档位时）；失败不抛到 UI。 */
