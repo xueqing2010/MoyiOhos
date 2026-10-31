@@ -59,6 +59,7 @@ devecocli run --module entry --device 2BD0223929003920 --skip-build
 
 - **华为账号 / 云同步**：已在 1.2 中移除登录与云同步入口，书籍、进度、偏好只保存在本机。
 - **真机启动**：开发者模式下 CLI 无法自动解锁屏幕，必须先手动解锁或在解锁态运行；锁屏时 `aa start` 返回 10106102。
+- **本地 OCR 线程**：TaskPool / 专用 Worker 均无法稳定运行 PP-OCRv6 rec（Session closed 或 code -1），已回退主线程；需要原生异步推理或更换运行时。
 - **2in1 模拟器**：当前环境 MateBook Pro 模拟器启动失败，2in1 窗口缩放/拖拽未完成真机回归。
 - **EPUB picker**：部分系统 UIExtension 环境限制文件选择器，建议真机验证。
 - **GGUF 推理**：模型体积 1GB 级，本轮仅验证下载/暂停/存储，未跑完整 token 生成。
