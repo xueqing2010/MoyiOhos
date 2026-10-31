@@ -117,6 +117,9 @@ struct ReaderPageLayer {
   @Prop @Watch('onTranslationRev') translationRev: number = 0;
   onSingleTap: (x: number, width: number) => void = () => {
   };
+  /** 长按气泡：仅未合并的单行可校对，参数为 OCR 行索引与当前译文。 */
+  onEditBubble: (lineIndex: number, text: string) => void = () => {
+  };
 
   @State areaW: number = 0;
   @State areaH: number = 0;
@@ -324,6 +327,39 @@ struct ReaderPageLayer {
     ctx.restore();
   }
 
+  /** 长按位置命中单个 OCR 行时回调校对；合并块暂不支持。 */
+  private handleLongPress(localX: number, localY: number): void {
+    if (this.mode === ReaderMode.RAW || this.pageSize.width <= 0 || this.areaW <= 0 || this.areaH <= 0) {
+      return;
+    }
+    let scale = 0;
+    let dx = 0;
+    let dy = 0;
+    if (this.fitWidth) {
+      scale = this.areaW / this.pageSize.width;
+    } else {
+      const fit = containFit(this.pageSize.width, this.pageSize.height, this.areaW, this.areaH);
+      scale = fit.scale;
+      dx = fit.dx;
+      dy = fit.dy;
+    }
+    if (scale <= 0) {
+      return;
+    }
+    const pageX = (localX - dx) / scale;
+    const pageY = (localY - dy) / scale;
+    for (const item of this.planItems) {
+      if (item.merged !== 1 || item.indices === undefined || item.indices.length !== 1) {
+        continue;
+      }
+      const box = item.box;
+      if (pageX >= box.x && pageX <= box.x + box.w && pageY >= box.y && pageY <= box.y + box.h) {
+        this.onEditBubble(item.indices[0], item.text);
+        return;
+      }
+    }
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Image(toMediaUri(this.mode !== ReaderMode.RAW && this.cleanedPath.length > 0
@@ -384,6 +420,11 @@ struct ReaderPageLayer {
     .onClick((event: ClickEvent) => {
       this.onSingleTap(event.x, this.areaW);
     })
+    .gesture(LongPressGesture().onAction((event: GestureEvent) => {
+      if (event.fingerList.length > 0) {
+        this.handleLongPress(event.fingerList[0].localX, event.fingerList[0].localY);
+      }
+    }))
   }
 }
 
@@ -435,6 +476,10 @@ export struct ReaderPage {
   @State exportDone: number = 0;
   @State exportTotal: number = 0;
   @State toast: string = '';
+  @State editVisible: boolean = false;
+  @State editLine: number = -1;
+  @State editText: string = '';
+  @State editBusy: boolean = false;
   @State animScale: Array<number> = [];
   @State animOpacity: Array<number> = [];
   @State animTranslate: Array<number> = [];
@@ -1108,6 +1153,36 @@ export struct ReaderPage {
     this.translating = false;
   }
 
+  private openBubbleEditor(lineIndex: number, text: string): void {
+    this.editLine = lineIndex;
+    this.editText = text;
+    this.editVisible = true;
+    this.editBusy = false;
+    this.menuVisible = false;
+    this.settingsVisible = false;
+  }
+
+  private async saveBubbleEdit(): Promise<void> {
+    if (this.editBusy || this.editLine < 0) {
+      return;
+    }
+    const page = this.pages[this.currentIndex];
+    if (page === undefined) {
+      return;
+    }
+    this.editBusy = true;
+    try {
+      await ReaderViewModel.updateTranslationLine(page.id, this.editLine, this.editText.trim());
+      this.transRev++;
+      this.currentTranslated = true;
+      this.editVisible = false;
+      this.showToast('译文已保存');
+    } catch (e) {
+      this.showToast('保存失败：' + e);
+    }
+    this.editBusy = false;
+  }
+
   private onBatchState(s: BatchState): void {
     this.batchRunning = s.running;
     this.batchTotal = s.total;
@@ -1253,6 +1328,9 @@ export struct ReaderPage {
         translationRev: this.transRev,
           onSingleTap: (x: number, width: number) => {
             this.tapZone(width > 0 ? x / width : 0.5);
+          },
+          onEditBubble: (lineIndex: number, text: string) => {
+            this.openBubbleEditor(lineIndex, text);
           }
         })
           .width('100%')
@@ -1330,6 +1408,9 @@ export struct ReaderPage {
       translationRev: this.transRev,
         onSingleTap: (x: number, width: number) => {
           this.tapZone(width > 0 ? x / width : 0.5);
+        },
+        onEditBubble: (lineIndex: number, text: string) => {
+          this.openBubbleEditor(lineIndex, text);
         }
       })
         .width('100%')
@@ -1743,6 +1824,63 @@ export struct ReaderPage {
     .justifyContent(FlexAlign.Center)
   }
 
+  @Builder
+  bubbleEditOverlay() {
+    Column() {
+      Column({ space: 12 }) {
+        Text('校对译文')
+          .fontSize(ThemeTokens.FONT_SUBTITLE)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(ThemeTokens.TEXT_PRIMARY)
+        TextArea({ text: this.editText, placeholder: '输入译文' })
+          .width('100%')
+          .height(120)
+          .fontSize(ThemeTokens.FONT_BODY)
+          .backgroundColor(ThemeTokens.SURFACE_VARIANT)
+          .borderRadius(ThemeTokens.RADIUS_SMALL)
+          .onChange((value: string) => {
+            this.editText = value;
+          })
+        Row({ space: 10 }) {
+          Button('取消')
+            .fontSize(ThemeTokens.FONT_SMALL)
+            .fontColor(ThemeTokens.TEXT_SECONDARY)
+            .backgroundColor(ThemeTokens.SURFACE_VARIANT)
+            .borderRadius(ThemeTokens.RADIUS_PILL)
+            .height(34)
+            .layoutWeight(1)
+            .onClick(() => {
+              this.editVisible = false;
+            })
+          Button(this.editBusy ? '保存中…' : '保存')
+            .fontSize(ThemeTokens.FONT_SMALL)
+            .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
+            .backgroundColor(ThemeTokens.PRIMARY)
+            .borderRadius(ThemeTokens.RADIUS_PILL)
+            .height(34)
+            .layoutWeight(1)
+            .enabled(!this.editBusy)
+            .onClick(() => {
+              this.saveBubbleEdit();
+            })
+        }
+        .width('100%')
+      }
+      .width('86%')
+      .padding(ThemeTokens.PAGE_PADDING)
+      .borderRadius(ThemeTokens.RADIUS_CARD)
+      .backgroundColor(ThemeTokens.SURFACE)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#99000000')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .onClick(() => {
+    })
+  }
+
   build() {
     NavDestination() {
       if (!this.loaded) {
@@ -1840,6 +1978,9 @@ export struct ReaderPage {
           }
           if (this.showExportModes) {
             this.exportModeDialog()
+          }
+          if (this.editVisible) {
+            this.bubbleEditOverlay()
           }
         }
         .width('100%')

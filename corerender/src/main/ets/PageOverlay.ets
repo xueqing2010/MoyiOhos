@@ -21,13 +21,18 @@ export interface OverlayItem {
   merged: number;
   /** 该块文字色；空串表示用调用方默认色。 */
   textColor?: string;
+  /** 该块对应的 OCR 行索引（用于气泡级人工校对）。 */
+  indices?: Array<number>;
 }
 
 function makeOverlayItem(box: DisplayRect, text: string, layout: TextLayout, merged: number,
-  textColor?: string): OverlayItem {
+  textColor?: string, indices?: Array<number>): OverlayItem {
   const item: OverlayItem = { box: box, text: text, layout: layout, merged: merged };
   if (textColor !== undefined) {
     item.textColor = textColor;
+  }
+  if (indices !== undefined) {
+    item.indices = indices;
   }
   return item;
 }
@@ -224,7 +229,7 @@ export class PageOverlay {
     if (!mergeWhite || count === 1) {
       for (let i = 0; i < count; i++) {
         const layout = LayoutEngine.layout(texts[i], boxes[i], resolveOptions(opts, boxes[i], texts[i]));
-        items.push(makeOverlayItem(boxes[i], texts[i], layout, 1, colors[i]));
+        items.push(makeOverlayItem(boxes[i], texts[i], layout, 1, colors[i], [i]));
       }
       return items;
     }
@@ -272,10 +277,12 @@ export class PageOverlay {
       let box: DisplayRect = boxes[members[0]];
       let text = '';
       let textColor = '';
+      const indices: Array<number> = [];
       for (let k = 0; k < members.length; k++) {
         const idx = members[k];
         box = unionRect(box, boxes[idx]);
         text = joinText(text, texts[idx]);
+        indices.push(idx);
         if (textColor.length === 0 && colors[idx].length > 0) {
           textColor = colors[idx];
         }
@@ -284,7 +291,7 @@ export class PageOverlay {
       const groupOpts = resolveOptions(opts, box, text);
       sortMembers(members, boxes, groupOpts);
       const layout = LayoutEngine.layout(text, box, groupOpts);
-      items.push(makeOverlayItem(box, text, layout, members.length, textColor));
+      items.push(makeOverlayItem(box, text, layout, members.length, textColor, indices));
     }
     return items;
   }

@@ -437,6 +437,20 @@ export class ReaderViewModel {
     ReaderViewModel.translationCache.set(pt.pageId, pt);
   }
 
+  /** 气泡级人工校对：更新单行译文并落库。 */
+  static async updateTranslationLine(pageId: number, index: number, text: string): Promise<void> {
+    const pt = await ReaderViewModel.getTranslation(pageId);
+    if (pt === undefined) {
+      throw new Error('该页尚无译文');
+    }
+    if (index < 0 || index >= pt.translations.length) {
+      throw new Error('译文行号无效');
+    }
+    pt.translations[index] = text;
+    await PageRepository.saveTranslation(pt);
+    ReaderViewModel.putTranslation(pt);
+  }
+
   static invalidateTranslation(pageId: number): void {
     ReaderViewModel.translationCache.delete(pageId);
   }
