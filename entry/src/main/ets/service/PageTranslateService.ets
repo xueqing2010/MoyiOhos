@@ -69,7 +69,7 @@ export class PageTranslateService {
     service.configureLocal(OcrModelService.path(models[0]), OcrModelService.path(models[1]),
       PageTranslateService.dictText);
     service.setLocalEnabled(true);
-    OcrRecService.initRec(OcrModelService.path(models[1]));
+    OcrRecService.initNative(OcrModelService.path(models[0]), OcrModelService.path(models[1]));
   }
 
   /** 启动预热：系统 OCR 初始化或本地 OCR 会话加载，失败只记日志。 */
@@ -120,11 +120,8 @@ export class PageTranslateService {
       let regions: Array<OcrRegion> = [];
       if (localOcr) {
         try {
-          const boxes = await OcrService.getInstance().detectBoxes(page.imagePath);
-          if (boxes.length > 0) {
-            regions = await OcrRecService.recognizeRegions(page.imagePath, boxes,
-              PageTranslateService.dictText);
-          }
+          regions = await OcrRecService.recognizePage(page.imagePath,
+            PageTranslateService.dictText);
         } catch (e) {
           Log.warn(TAG, 'native det/rec failed, fallback JS: ' + e);
         }

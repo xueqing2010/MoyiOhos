@@ -3,32 +3,39 @@ import { image } from '@kit.ImageKit';
 import { taskpool } from '@kit.ArkTS';
 import { OcrRegion, makeOcrRegion, makePixelRect } from 'coremodel';
 import { Log, toMediaUri } from 'commons';
-import { initRec as nativeInitRec } from 'libocrasync.so';
-import { recBoxesNative } from '../workers/OcrRecTask';
+import { initRec as nativeInitRec, initDet as nativeInitDet } from 'libocrasync.so';
+import { detectBoxesNative, recBoxesNative } from '../workers/OcrRecTask';
 
 const TAG = 'OcrRecService';
 
-/** 原生 rec 的 ArkTS 封装：det 仍在 coreocr，rec 走 TaskPool + ONNX Runtime C API。 */
+/** 原生 det+rec：主线程只解码 RGBA，检测与识别都在 TaskPool 原生线程。 */
 export class OcrRecService {
-  private static initialized: boolean = false;
+  private static recReady: boolean = false;
+  private static detReady: boolean = false;
 
-  static initRec(modelPath: string): boolean {
-    if (OcrRecService.initialized) {
-      return true;
-    }
+  static initNative(detPath: string, recPath: string): boolean {
     try {
-      const ok: boolean = (nativeInitRec as (path: string) => boolean)(modelPath);
-      OcrRecService.initialized = ok;
-      return ok;
+      if (!OcrRecService.detReady) {
+        OcrRecService.detReady = (nativeInitDet as (p: string) => boolean)(detPath);
+      }
+      if (!OcrRecService.recReady) {
+        OcrRecService.recReady = (nativeInitRec as (p: string) => boolean)(recPath);
+      }
+      Log.info(TAG, 'native init det=' + OcrRecService.detReady + ' rec=' + OcrRecService.recReady);
+      return OcrRecService.detReady && OcrRecService.recReady;
     } catch (e) {
-      Log.warn(TAG, 'native rec init failed: ' + e);
+      Log.warn(TAG, 'native init failed: ' + e);
       return false;
     }
   }
 
-  static async recognizeRegions(pagePath: string, boxes: Array<number>,
-    dict: string): Promise<Array<OcrRegion>> {
-    if (!OcrRecService.initialized || boxes.length < 4) {
+  static isReady(): boolean {
+    return OcrRecService.detReady && OcrRecService.recReady;
+  }
+
+  static async recognizePage(pagePath: string, dict: string): Promise<Array<OcrRegion>> {
+    if (!OcrRecService.isReady()) {
+      Log.warn(TAG, 'native not ready');
       return [];
     }
     let source: image.ImageSource | undefined = undefined;
@@ -53,7 +60,14 @@ export class OcrRecService {
       const h = info.size.height;
       const buffer = new ArrayBuffer(w * h * 4);
       await pm.readPixelsToBuffer(buffer);
-      const texts = await taskpool.execute(recBoxesNative, buffer, w, h, boxes, dict) as Array<string>;
+      const detBuffer = new Uint8Array(buffer).slice().buffer;
+      const boxes = await taskpool.execute(detectBoxesNative, detBuffer, w, h) as Array<number>;
+      Log.info(TAG, 'native det boxes=' + boxes.length);
+      if (boxes.length === 0) {
+        return [];
+      }
+      const recBuffer = new Uint8Array(buffer).slice().buffer;
+      const texts = await taskpool.execute(recBoxesNative, recBuffer, w, h, boxes, dict) as Array<string>;
       const out: Array<OcrRegion> = [];
       const pageArea = w * h;
       for (let i = 0; i < texts.length; i++) {
@@ -75,10 +89,10 @@ export class OcrRecService {
         }
         return a.box.x - b.box.x;
       });
-      Log.info(TAG, 'native rec regions=' + out.length);
+      Log.info(TAG, 'native det+rec regions=' + out.length);
       return out;
     } catch (e) {
-      Log.warn(TAG, 'native rec failed: ' + e);
+      Log.warn(TAG, 'native det+rec failed: ' + e);
       return [];
     } finally {
       if (pm !== undefined) {

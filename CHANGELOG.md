@@ -13,7 +13,7 @@
 - 修复本地 OCR 图片路径（媒体 URI + fd 回退）、GGUF 导入必须复制进沙箱、模型恢复只认 .gguf、下载完整性校验。
 - 第二批：新增轻量去字底图缓存（框外底色梯度填充），翻译态用透明覆盖替代白块；本地 llama 按 3–4 行批量生成。
 - TaskPool 本地 OCR 经真机验证与 ONNX Runtime 全局环境冲突（Session is closed / already initialized），已回退主线程，后续改用单一专用 Worker。
-- P0-5：新增 ONNX Runtime C API 原生 rec 桥（libocrasync.so）+ TaskPool，rec 识别移出 UI 线程；模拟器 6 行 native rec 验证通过，det 仍在主线程。
+- P0-5：新增 ONNX Runtime C API 原生 det+rec 桥（libocrasync.so）+ TaskPool；主线程只解码 RGBA，det/rec 全在原生线程；模拟器 6 行验证通过，OCR 594ms、总 2057ms。
 - 漫画页目标语言改为读取设置页 `target_lang`，不再硬编码中文。
 - 本地 llama 翻译按空间位置合并气泡/段落（垂直间距 + 水平重叠）；6 行合成页实测 OCR 739ms + 翻译 1291ms。
 - 去字底图同时采样每框边缘亮度，覆盖层逐块选择黑/白字并加 1px 描边，提升深色/复杂背景可读性。
