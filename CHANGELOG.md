@@ -15,6 +15,7 @@
 - TaskPool 本地 OCR 经真机验证与 ONNX Runtime 全局环境冲突（Session is closed / already initialized），已回退主线程，后续改用单一专用 Worker。
 - 漫画页目标语言改为读取设置页 `target_lang`，不再硬编码中文。
 - 本地 llama 翻译按空间位置合并气泡/段落（垂直间距 + 水平重叠）；6 行合成页实测 OCR 739ms + 翻译 1291ms。
+- 去字底图同时采样每框边缘亮度，覆盖层逐块选择黑/白字并加 1px 描边，提升深色/复杂背景可读性。
 - GGUF 翻译模型改用 ModelScope 国内镜像，实测 21.9MB/s。
 - 修复模型管理存储统计为 0B（mkdir EEXIST）并纳入缓存分片。
 

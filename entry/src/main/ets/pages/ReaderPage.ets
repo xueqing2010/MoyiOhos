@@ -122,6 +122,7 @@ struct ReaderPageLayer {
   @State areaH: number = 0;
   @State imageFailed: boolean = false;
   @State cleanedPath: string = '';
+  @State cleanColors: Array<string> = [];
   private ctx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
   private pageSize: PageSize = new PageSize();
   private translation: PageTranslation | undefined = undefined;
@@ -158,6 +159,7 @@ struct ReaderPageLayer {
     }
     if (this.mode === ReaderMode.RAW) {
       this.cleanedPath = '';
+      this.cleanColors = [];
     } else {
       this.prepareClean();
     }
@@ -186,6 +188,7 @@ struct ReaderPageLayer {
     this.translation = pt;
     this.transLoaded = true;
     this.cleanedPath = '';
+    this.cleanColors = [];
     this.prepareClean();
     this.draw();
   }
@@ -200,6 +203,7 @@ struct ReaderPageLayer {
     const path = await PageImageCleaner.ensure(this.page.id, this.page.imagePath, pt.ocr);
     if (path !== undefined && path.length > 0) {
       this.cleanedPath = path;
+      this.cleanColors = PageImageCleaner.textColors(this.page.id);
       this.draw();
     }
   }
@@ -288,14 +292,19 @@ struct ReaderPageLayer {
         w: region.box.w,
         h: region.box.h
       };
+      const textColor = i < this.cleanColors.length ? this.cleanColors[i] : '';
       const item: OverlayRegion = { box: box, original: region.text, translated: text };
+      if (textColor.length > 0) {
+        item.textColor = textColor;
+      }
       regions.push(item);
     }
     // 仅当页/译文/排版参数变化时重新 build；尺寸变化只需重新 paint。
     const key = this.page.id + '|' + this.mode + '|' + this.renderRev + '|' + this.translationRev
       + '|' + this.whiteMerge + '|' + this.fontMode + '|' + this.fixedSize + '|' + this.orientation
       + '|' + this.vdir + '|' + this.lineHeight + '|' + this.pageSize.width + 'x' + this.pageSize.height
-      + '|' + useTranslated;
+      + '|' + useTranslated + '|' + this.cleanedPath + '|' + this.cleanColors.length
+      + '|' + (this.cleanColors.length > 0 ? this.cleanColors[0] : '');
     if (key !== this.planKey) {
       this.planItems = PageOverlay.build(regions, opts, useTranslated, this.whiteMerge);
       this.planKey = key;

@@ -117,7 +117,10 @@ export class OverlayRenderer {
         ctx.fillStyle = colors.boxFill;
         ctx.fillRect(dx + box.x * scale, dy + box.y * scale, box.w * scale, box.h * scale);
       }
-      ctx.fillStyle = colors.textColor;
+      const itemColor = item.textColor !== undefined && item.textColor.length > 0
+        ? item.textColor : colors.textColor;
+      const outline = itemColor.toUpperCase() === '#1A1A1A' ? '#FFFFFF' : '#1A1A1A';
+      ctx.fillStyle = itemColor;
       let lastFs = -1;
       const runs = item.layout.runs;
       for (let k = 0; k < runs.length; k++) {
@@ -130,6 +133,11 @@ export class OverlayRenderer {
           ctx.font = OverlayRenderer.fontOf(fs, fontUnit);
           lastFs = fs;
         }
+        // 1px 级描边保证浅底黑字/深底白字都能读清。
+        ctx.lineWidth = Math.max(1, fs * 0.06);
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = outline;
+        ctx.strokeText(run.char, dx + run.x * scale, dy + run.y * scale);
         ctx.fillText(run.char, dx + run.x * scale, dy + run.y * scale);
       }
     }

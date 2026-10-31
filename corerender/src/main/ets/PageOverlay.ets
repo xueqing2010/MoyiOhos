@@ -19,10 +19,16 @@ export interface OverlayItem {
   layout: TextLayout;
   /** 合并了多少个 OCR 行（1 = 未合并）。 */
   merged: number;
+  /** 该块文字色；空串表示用调用方默认色。 */
+  textColor?: string;
 }
 
-function makeOverlayItem(box: DisplayRect, text: string, layout: TextLayout, merged: number): OverlayItem {
+function makeOverlayItem(box: DisplayRect, text: string, layout: TextLayout, merged: number,
+  textColor?: string): OverlayItem {
   const item: OverlayItem = { box: box, text: text, layout: layout, merged: merged };
+  if (textColor !== undefined) {
+    item.textColor = textColor;
+  }
   return item;
 }
 
@@ -174,6 +180,7 @@ export class PageOverlay {
     mergeWhite: boolean): Array<OverlayItem> {
     const boxes: Array<DisplayRect> = [];
     const texts: Array<string> = [];
+    const colors: Array<string> = [];
     for (let i = 0; i < regions.length; i++) {
       const region = regions[i];
       const text = useTranslated ? region.translated : region.original;
@@ -207,6 +214,7 @@ export class PageOverlay {
       const box: DisplayRect = { x: bx, y: by, w: bw, h: bh };
       boxes.push(box);
       texts.push(text);
+      colors.push(region.textColor !== undefined ? region.textColor : '');
     }
     const count = boxes.length;
     const items: Array<OverlayItem> = [];
@@ -216,7 +224,7 @@ export class PageOverlay {
     if (!mergeWhite || count === 1) {
       for (let i = 0; i < count; i++) {
         const layout = LayoutEngine.layout(texts[i], boxes[i], resolveOptions(opts, boxes[i], texts[i]));
-        items.push(makeOverlayItem(boxes[i], texts[i], layout, 1));
+        items.push(makeOverlayItem(boxes[i], texts[i], layout, 1, colors[i]));
       }
       return items;
     }
@@ -263,16 +271,20 @@ export class PageOverlay {
       const members = groups[g];
       let box: DisplayRect = boxes[members[0]];
       let text = '';
+      let textColor = '';
       for (let k = 0; k < members.length; k++) {
         const idx = members[k];
         box = unionRect(box, boxes[idx]);
         text = joinText(text, texts[idx]);
+        if (textColor.length === 0 && colors[idx].length > 0) {
+          textColor = colors[idx];
+        }
       }
       // 合并后按整块宽高重新推断方向，再按该方向排序成员。
       const groupOpts = resolveOptions(opts, box, text);
       sortMembers(members, boxes, groupOpts);
       const layout = LayoutEngine.layout(text, box, groupOpts);
-      items.push(makeOverlayItem(box, text, layout, members.length));
+      items.push(makeOverlayItem(box, text, layout, members.length, textColor));
     }
     return items;
   }

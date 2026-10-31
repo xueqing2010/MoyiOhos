@@ -59,6 +59,8 @@ export interface OverlayRegion {
   box: DisplayRect;
   original: string;
   translated: string;
+  /** 可选文字色（由去字底图采样得到）；空/未设时由渲染端默认色兜底。 */
+  textColor?: string;
 }
 
 /** Character width measurer; default approximation is deterministic for tests. */

@@ -12,10 +12,20 @@ const TAG = 'PageImageCleaner';
  */
 export class PageImageCleaner {
   private static pending: Map<number, Promise<string | undefined>> = new Map();
+  private static colors: Map<number, Array<string>> = new Map();
 
   static cleanPath(pageId: number): string {
     const ctx = AppEnv.getInstance().getContext();
-    return ctx.cacheDir + '/clean/page_' + pageId + '_v6.jpg';
+    return ctx.cacheDir + '/clean/page_' + pageId + '_v7.jpg';
+  }
+
+  static colorsPath(pageId: number): string {
+    return PageImageCleaner.cleanPath(pageId) + '.colors';
+  }
+
+  static textColors(pageId: number): Array<string> {
+    const cached = PageImageCleaner.colors.get(pageId);
+    return cached !== undefined ? cached : [];
   }
 
   static async ensure(pageId: number, imagePath: string,
@@ -23,6 +33,11 @@ export class PageImageCleaner {
     const cached = PageImageCleaner.cleanPath(pageId);
     try {
       if (fs.accessSync(cached) && fs.statSync(cached).size > 1024) {
+        try {
+          const text = fs.readTextSync(PageImageCleaner.colorsPath(pageId));
+          PageImageCleaner.colors.set(pageId, text.split(','));
+        } catch (e) {
+        }
         return cached;
       }
     } catch (e) {
@@ -72,6 +87,7 @@ export class PageImageCleaner {
       const buffer = new ArrayBuffer(w * h * 4);
       await pm.readPixelsToBuffer(buffer);
       const rgba = new Uint8Array(buffer);
+      const colors = PageImageCleaner.chooseColors(rgba, w, h, regions);
       PageImageCleaner.erase(rgba, w, h, regions);
       const out = await image.createPixelMap(buffer, {
         size: { width: w, height: h },
@@ -100,6 +116,17 @@ export class PageImageCleaner {
       }
       packer.release();
       out.release();
+      try {
+        const colorDst = fs.openSync(PageImageCleaner.colorsPath(pageId),
+          fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC);
+        try {
+          fs.writeSync(colorDst.fd, colors.join(','));
+        } finally {
+          fs.closeSync(colorDst);
+        }
+        PageImageCleaner.colors.set(pageId, colors);
+      } catch (e) {
+      }
       Log.info(TAG, 'cleaned page ' + pageId + ' -> ' + path);
       return path;
     } catch (e) {
@@ -125,6 +152,39 @@ export class PageImageCleaner {
         }
       }
     }
+  }
+
+  /** 根据框外底色亮度选择黑/白文字色，供 OverlayRenderer 逐块使用。 */
+  private static chooseColors(rgba: Uint8Array, w: number, h: number,
+    regions: Array<OcrRegion>): Array<string> {
+    const out: Array<string> = [];
+    const pageArea = w * h;
+    for (const region of regions) {
+      const box = region.box;
+      if (box.w * box.h > pageArea * 0.15
+        || (region.text.length <= 2 && box.w * box.h > pageArea * 0.04)) {
+        out.push('#1A1A1A');
+        continue;
+      }
+      const pad = 4;
+      const x0 = Math.max(2, Math.floor(box.x) - pad);
+      const y0 = Math.max(2, Math.floor(box.y) - pad);
+      const x1 = Math.min(w - 2, Math.ceil(box.x + box.w) + pad);
+      const y1 = Math.min(h - 2, Math.ceil(box.y + box.h) + pad);
+      if (x1 <= x0 || y1 <= y0) {
+        out.push('#1A1A1A');
+        continue;
+      }
+      const left = PageImageCleaner.avgColumn(rgba, w, x0 - 1, y0, y1);
+      const right = PageImageCleaner.avgColumn(rgba, w, x1 + 1, y0, y1);
+      const top = PageImageCleaner.avgRow(rgba, w, y0 - 1, x0, x1);
+      const bottom = PageImageCleaner.avgRow(rgba, w, y1 + 1, x0, x1);
+      const lum = ((left[0] + right[0] + top[0] + bottom[0]) * 0.299
+        + (left[1] + right[1] + top[1] + bottom[1]) * 0.587
+        + (left[2] + right[2] + top[2] + bottom[2]) * 0.114) / 4;
+      out.push(lum < 120 ? '#F5F5F5' : '#1A1A1A');
+    }
+    return out;
   }
 
   /** 用框外上下左右四条边的平均色做双线性填充，边缘保留原像素。 */
