@@ -1,4 +1,4 @@
-import { uiMaterial, window } from '@kit.ArkUI';
+import { font, uiMaterial, window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import {
   ThemeTokens,
@@ -61,6 +61,11 @@ struct Index {
   private stopBreakpoint: (() => void) | undefined = undefined;
 
   aboutToAppear(): void {
+    try {
+      font.registerFont({ familyName: 'StarFlowSans', familySrc: $rawfile('fonts/NotoSansSC.otf') });
+    } catch (e) {
+      Log.warn('Index', 'register custom font failed: ' + e);
+    }
     try {
       window.getLastWindow(getContext(this)).then((win: window.Window) => {
         const area = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);

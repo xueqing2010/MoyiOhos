@@ -25,6 +25,12 @@ Copyright (C) 2026 xueqing2010 and contributors
   - 华为 HarmonyOS 系统能力，按 HarmonyOS SDK 许可使用；本仓库不分发其源码或二进制。
   - 用途：OCR（Core Vision Kit textRecognition）、UI 框架、RDB/Preferences/Asset Store。
 
+- **Noto Sans CJK SC**
+  - 项目地址：https://github.com/notofonts/noto-cjk
+  - 许可证：SIL Open Font License 1.1
+  - 位置：`entry/src/main/resources/rawfile/fonts/NotoSansSC.otf`
+  - 用途：覆盖层/导出统一的中日文字体。
+
 ## 模型
 
 本仓库**不包含任何 GGUF 模型文件**。用户自行下载或导入的模型遵循其各自发布方的许可
