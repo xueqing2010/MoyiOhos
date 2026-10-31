@@ -11,6 +11,7 @@ import { PageRepository } from '../data/PageRepository';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { OcrModelService } from './OcrModelService';
 import { GlossaryService } from './GlossaryService';
+import { OcrRecService } from './OcrRecService';
 
 const TAG = 'PageTranslateService';
 const PREF_FILE = 'starflow_translate';
@@ -68,6 +69,7 @@ export class PageTranslateService {
     service.configureLocal(OcrModelService.path(models[0]), OcrModelService.path(models[1]),
       PageTranslateService.dictText);
     service.setLocalEnabled(true);
+    OcrRecService.initRec(OcrModelService.path(models[1]));
   }
 
   /** 启动预热：系统 OCR 初始化或本地 OCR 会话加载，失败只记日志。 */
@@ -115,8 +117,23 @@ export class PageTranslateService {
       // ONNX Runtime 的环境/会话在 TaskPool 中会与其他 worker 冲突
       // （Session is closed / OnnxEnvironment already initialized），
       // 当前版本回到主线程；后续用单一专用 Worker 再迁移。
-      const regions: Array<OcrRegion> = await OcrService.getInstance()
-        .recognize(localOcr ? undefined : pixelMap, lang, page.imagePath);
+      let regions: Array<OcrRegion> = [];
+      if (localOcr) {
+        try {
+          const boxes = await OcrService.getInstance().detectBoxes(page.imagePath);
+          if (boxes.length > 0) {
+            regions = await OcrRecService.recognizeRegions(page.imagePath, boxes,
+              PageTranslateService.dictText);
+          }
+        } catch (e) {
+          Log.warn(TAG, 'native det/rec failed, fallback JS: ' + e);
+        }
+        if (regions.length === 0) {
+          regions = await OcrService.getInstance().recognize(undefined, lang, page.imagePath);
+        }
+      } else {
+        regions = await OcrService.getInstance().recognize(pixelMap, lang, page.imagePath);
+      }
       const ocrMs = Date.now() - tOcr;
       PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, 35, 0, regions.length,
         '识别完成 ' + regions.length + ' 行');

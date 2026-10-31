@@ -37,3 +37,13 @@ target_link_libraries(llamacpp PUBLIC
     ggml
     ${ace-lib}
     ${ace_napi-lib})
+
+# --- Native OCR rec bridge (ONNX Runtime C API, arm64) ---
+set(ORT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../oh_modules/.ohpm/@ohos+onnxruntime@1.0.0/oh_modules/@ohos/onnxruntime)
+add_library(ocrasync SHARED ocr_bridge.cpp)
+target_include_directories(ocrasync PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime/include)
+target_link_libraries(ocrasync PUBLIC
+    ${ORT_ROOT}/libs/arm64-v8a/liblibrary.so
+    ${ace-lib}
+    ${ace_napi-lib})

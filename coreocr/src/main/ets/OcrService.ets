@@ -59,6 +59,16 @@ export class OcrService {
     return await engine.recognize(pagePath);
   }
 
+  /** 仅 det（供 Entry 的原生 rec 异步链路使用）。 */
+  async detectBoxes(pagePath: string): Promise<Array<number>> {
+    if (this.localConfig === undefined) {
+      throw new Error('本地模型未配置');
+    }
+    const engine = LocalOcrEngine.getInstance();
+    await engine.init(this.localConfig);
+    return await engine.detectBoxes(pagePath);
+  }
+
   /** 启动预热本地模型（仅在用户选择 local 档位时）；失败不抛到 UI。 */
   async prewarmLocal(): Promise<void> {
     if (!this.localEnabled || this.localConfig === undefined) {

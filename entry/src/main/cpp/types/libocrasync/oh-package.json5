@@ -1,0 +1,9 @@
+{
+  "name": "libocrasync",
+  "version": "1.0.0",
+  "description": "ONNX Runtime native OCR rec bridge (StarFlowOhos)",
+  "main": "",
+  "author": "",
+  "license": "",
+  "types": "./index.d.ets"
+}

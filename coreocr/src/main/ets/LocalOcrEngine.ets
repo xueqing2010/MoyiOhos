@@ -115,6 +115,23 @@ export class LocalOcrEngine {
         this.dict = [];
         this.configKey = '';
     }
+    /** 仅跑 det，返回扁平框 [x,y,w,h,...]；供 Entry 原生 rec 异步使用。 */
+    async detectBoxes(pagePath: string): Promise<Array<number>> {
+        if (this.detSession === undefined) {
+            throw new Error('本地 OCR 检测模型尚未初始化');
+        }
+        const page = await this.loadPixels(pagePath);
+        const boxes = this.detect(page);
+        const out: Array<number> = [];
+        for (const box of boxes) {
+            out.push(box.x);
+            out.push(box.y);
+            out.push(box.w);
+            out.push(box.h);
+        }
+        return out;
+    }
+
     async recognize(pagePath: string): Promise<Array<OcrRegion>> {
         if (!this.isReady()) {
             throw new Error('本地 OCR 尚未初始化');

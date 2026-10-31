@@ -13,6 +13,7 @@
     "corerender": "file:../corerender",
     "corenovel": "file:../corenovel",
     "libllamacpp": "file:./src/main/cpp/types/libllamacpp",
+    "libocrasync": "file:./src/main/cpp/types/libocrasync",
     "@ohos/onnxruntime": "1.0.0",
     "@ohos/aki": "1.2.26"
   },

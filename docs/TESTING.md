@@ -42,7 +42,8 @@
 - P1-8 长按气泡弹出校对框，保存后 translations_json 更新成功；
 - P1-9 PDF 导出：1 页合成 PDF 约 26.6KB，保存到 files/exports。
 - 真机 PCE-W30 未连接，未做全分辨率真机复测；
-- TaskPool 本地 OCR 复现 `Session is closed` / `already initialized`，已回退主线程；
+- 原生 rec：`libocrasync.so` + TaskPool 识别 6 行成功，OCR 1784ms；rec 已移出 UI 线程，det 仍在主线程；
+- TaskPool 直接跑 JS ORT 仍复现 `Session is closed` / `already initialized`，因此改为原生 C API；
 - 真机 PCE-W30 未连接，未做真机复测。
 
 ## 复现命令
@@ -59,7 +60,7 @@ devecocli run --module entry --device 2BD0223929003920 --skip-build
 
 - **华为账号 / 云同步**：已在 1.2 中移除登录与云同步入口，书籍、进度、偏好只保存在本机。
 - **真机启动**：开发者模式下 CLI 无法自动解锁屏幕，必须先手动解锁或在解锁态运行；锁屏时 `aa start` 返回 10106102。
-- **本地 OCR 线程**：TaskPool / 专用 Worker 均无法稳定运行 PP-OCRv6 rec（Session closed 或 code -1），已回退主线程；需要原生异步推理或更换运行时。
+- **本地 OCR 线程**：原生 rec 已通过 libocrasync + TaskPool 移出 UI 线程；det 仍在主线程（约 0.4s），后续可继续下沉原生。TaskPool 直接跑 JS ORT 仍会 Session closed。
 - **2in1 模拟器**：当前环境 MateBook Pro 模拟器启动失败，2in1 窗口缩放/拖拽未完成真机回归。
 - **EPUB picker**：部分系统 UIExtension 环境限制文件选择器，建议真机验证。
 - **GGUF 推理**：模型体积 1GB 级，本轮仅验证下载/暂停/存储，未跑完整 token 生成。
