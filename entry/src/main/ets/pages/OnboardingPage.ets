@@ -37,7 +37,7 @@ export struct OnboardingPage {
   private swiperController: SwiperController = new SwiperController();
   private stopBreakpoint: (() => void) | undefined = undefined;
   private slides: Array<OnboardingSlide> = [
-    new OnboardingSlide('欢迎使用星译', '漫画 · 小说 · 文本翻译，一套蓝白阅读体验',
+    new OnboardingSlide('欢迎使用墨译', '漫画 · 小说 · 文本翻译，一套蓝白阅读体验',
       [
         '漫画与小说书架：本地文件导入后直接阅读',
         '页面 OCR + 译文回填：气泡级排版与竖排支持',

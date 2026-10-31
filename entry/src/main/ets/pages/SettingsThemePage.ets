@@ -188,7 +188,7 @@ export struct SettingsThemePage {
         .width('100%')
       Row({ space: 10 }) {
         Column({ space: 6 }) {
-          Text('星译')
+          Text('墨译')
             .fontSize(ThemeTokens.FONT_SUBTITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor(ThemeTokens.TEXT_PRIMARY)

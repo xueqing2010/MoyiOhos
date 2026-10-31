@@ -1,7 +1,7 @@
 {
   "name": "coretranslate",
   "version": "1.0.0",
-  "description": "StarFlow translation engines: Translator contract, Bing, OpenAI-compatible, local llama facade",
+  "description": "Moyi translation engines: Translator contract, Bing, OpenAI-compatible, local llama facade",
   "main": "Index.ets",
   "author": "",
   "license": "Apache-2.0",

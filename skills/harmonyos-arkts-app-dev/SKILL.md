@@ -5,7 +5,7 @@ description: HarmonyOS NEXT（ArkTS/ArkUI，API 26，DevEco Studio 6）应用从
 
 # HarmonyOS ArkTS 应用全流程开发
 
-这套 skill 来自一个真实项目：把 Android 上游「星译 StarFlow」在 HarmonyOS NEXT 上重做为 ArkTS 应用，包含漫画/小说阅读、OCR 覆盖层、在线与本地翻译、华为账号、云同步和三端布局。
+这套 skill 来自一个真实项目：把 Android 上游「StarFlow（星译）」在 HarmonyOS NEXT 上重做为 ArkTS 应用，包含漫画/小说阅读、OCR 覆盖层、在线与本地翻译、华为账号、云同步和三端布局。
 
 ## 何时使用
 
@@ -355,7 +355,7 @@ devecocli log --device <serial> --bundle-name <bundle> --crash --tail 50
 - [references/account-sign-cloud.md](references/account-sign-cloud.md)
 - [references/testing-and-automation.md](references/testing-and-automation.md)
 - [references/pitfalls.md](references/pitfalls.md)
-- [references/case-study-starflow.md](references/case-study-starflow.md)
+- [references/case-study-moyi.md](references/case-study-moyi.md)
 - [references/deveco-official-skills.md](references/deveco-official-skills.md)
 - [references/arkts-official-gotchas.md](references/arkts-official-gotchas.md)
 - [scripts/install-deveco-skills.sh](scripts/install-deveco-skills.sh)

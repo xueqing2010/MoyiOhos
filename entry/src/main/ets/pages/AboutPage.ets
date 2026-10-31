@@ -112,7 +112,7 @@ export struct AboutPage {
         .width(72)
         .height(72)
         .borderRadius(20)
-      Text('星译 StarFlow')
+      Text('墨译 Moyi')
         .fontSize(ThemeTokens.FONT_DISPLAY)
         .fontWeight(FontWeight.Bold)
         .fontColor(ThemeTokens.TEXT_PRIMARY)
@@ -186,7 +186,7 @@ export struct AboutPage {
 
             this.sectionTitle('许可与来源')
             AboutCard() {
-              Text('本应用参照上游开源项目 StarFlow（LGPL-3.0）的信息架构与行为，在 HarmonyOS 上以 ArkTS 独立重写实现，未直接复制上游代码文本。')
+              Text('本应用参照上游开源项目 StarFlow（星译，LGPL-3.0）的信息架构与行为，在 HarmonyOS 上以 ArkTS 独立重写实现，未直接复制上游代码文本。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_SECONDARY)
                 .width('100%')
@@ -243,7 +243,7 @@ export struct AboutPage {
                 this.navStack.pushPathByName(Routes.ONBOARDING, '');
               })
 
-            Text('StarFlowOhos · 阶段2 · 蓝白阅读')
+            Text('MoyiOhos · 阶段2 · 蓝白阅读')
               .fontSize(10)
               .fontColor(ThemeTokens.TEXT_TERTIARY)
               .width('100%')

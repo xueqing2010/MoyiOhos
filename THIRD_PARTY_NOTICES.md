@@ -1,8 +1,8 @@
 # 第三方许可与声明
 
-本文件汇总随 `StarFlowOhos` 分发的第三方组件许可。若与各组件原始许可文本冲突，以原始许可为准。
+本文件汇总随 `MoyiOhos` 分发的第三方组件许可。若与各组件原始许可文本冲突，以原始许可为准。
 
-## 1. StarFlow（Android 上游）— LGPL-3.0
+## 1. StarFlow（星译 · Android 上游）— LGPL-3.0
 
 - 仓库：https://github.com/xujunjiex/StarFlow
 - 许可：GNU Lesser General Public License v3.0
@@ -47,7 +47,7 @@ SOFTWARE.
 ## 4. 模型文件
 
 - 本仓库不包含 GGUF / ONNX 模型文件；用户在应用内下载或导入的模型遵循模型发布方许可。
-- PP-OCRv6 det/rec 模型与 `ppocrv6_dict.txt` 来自上游 StarFlow 的 `app/src/main/assets/ppocrv6`（LGPL-3.0 上游仓库；PP-OCR 原始项目为 PaddleOCR，Apache-2.0）。应用仅将字典打入安装包，模型由用户按需下载。
+- PP-OCRv6 det/rec 模型来自 **PaddlePaddle 官方 PP-OCRv6 small ONNX**（Apache-2.0），不再引用上游 StarFlow 的模型文件；`ppocrv6_dict.txt` 为 PaddleOCR 字典。模型由用户按需从官方镜像下载。
 
 ## 5. ONNX Runtime / @ohos/onnxruntime / AKI
 
@@ -59,4 +59,4 @@ HAP 内含上述项目的 arm64-v8a 原生库（`liblibrary.so`、`libaki_jsbind
 
 ## 6. 本项目自身
 
-StarFlowOhos（星译 StarFlow · HarmonyOS）— LGPL-3.0，完整文本见 [LICENSE](LICENSE)。
+MoyiOhos（墨译 Moyi · HarmonyOS）— LGPL-3.0，完整文本见 [LICENSE](LICENSE)。

@@ -1,7 +1,7 @@
 {
   "name": "corerender",
   "version": "1.0.0",
-  "description": "StarFlow overlay rendering: geometry, layout engine, overlay renderer, fps meter, stress scene",
+  "description": "Moyi overlay rendering: geometry, layout engine, overlay renderer, fps meter, stress scene",
   "main": "Index.ets",
   "author": "",
   "license": "Apache-2.0",

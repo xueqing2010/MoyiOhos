@@ -646,10 +646,10 @@ export class ExportService {
     }
   }
 
-  /** 默认保存名：星译-<漫画名>-yyyyMMdd-HHmmss.zip（唯一，避免 picker 重名拦截）。 */
+  /** 默认保存名：墨译-<漫画名>-yyyyMMdd-HHmmss.zip（唯一，避免 picker 重名拦截）。 */
   private static uniqueZipName(name: string): string {
     const safe = ExportService.safeFileName(name.length > 0 ? name : '漫画');
-    return `星译-${safe}-${ExportService.timeStamp()}.zip`;
+    return `墨译-${safe}-${ExportService.timeStamp()}.zip`;
   }
 
   /** yyyyMMdd-HHmmss。 */

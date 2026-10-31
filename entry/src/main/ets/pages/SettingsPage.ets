@@ -62,7 +62,7 @@ export struct SettingsPage {
     makeEntry('模型管理', 'GGUF 下载、导入与存储统计', $r('app.media.ic_model'), Routes.MODEL_MANAGER),
     makeEntry('常见问题', '使用疑问与故障排查', $r('app.media.ic_faq'), Routes.FAQ),
     makeEntry('开源致谢', '上游项目与第三方许可', $r('app.media.ic_github'), Routes.OPEN_SOURCE),
-    makeEntry('关于星译', '版本、构建模块与许可', $r('app.media.ic_about'), Routes.ABOUT),
+    makeEntry('关于墨译', '版本、构建模块与许可', $r('app.media.ic_about'), Routes.ABOUT),
     makeEntry('重新查看引导', '3 页快速上手', $r('app.media.ic_star'), Routes.ONBOARDING)
   ];
 

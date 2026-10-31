@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Generate StarFlow software-copyright application materials.
+"""Generate Moyi software-copyright application materials.
 
 Run with the bundled Python that has python-docx:
   /Users/kong/.dsh/dsh-runtimes/dsh-next-primary-runtime/dependencies/python/bin/python3       softcopyright/tools/generate_softcopyright.py
@@ -26,10 +26,10 @@ from docx.shared import Cm, Pt, RGBColor
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "softcopyright"
 IMAGES = ROOT / "docs" / "images"
-SOFTWARE_NAME = "星译漫画小说智能翻译软件"
-SOFTWARE_SHORT = "星译"
+SOFTWARE_NAME = "墨译漫画小说智能翻译软件"
+SOFTWARE_SHORT = "墨译"
 VERSION = "V1.1.0"
-APPLICANT = "【申请人名称，待填】"
+APPLICANT = "薛朝坤"
 DATE_TEXT = "2026年10月"
 
 SOURCE_EXTS = {".ets", ".cpp", ".h"}
@@ -294,7 +294,7 @@ def write_manual(out_docx: Path) -> None:
     # chapters
     chapters = [
         ("1 软件概述", [
-            "星译漫画小说智能翻译软件是面向 HarmonyOS NEXT 的本地漫画、小说与文本翻译工具。软件支持导入本地漫画图片和 EPUB/TXT 小说，使用本地 OCR 识别漫画文字，结合在线翻译服务或本地 llama.cpp 模型生成译文，并把译文按原文版式覆盖回页面。",
+            "墨译漫画小说智能翻译软件是面向 HarmonyOS NEXT 的本地漫画、小说与文本翻译工具。软件支持导入本地漫画图片和 EPUB/TXT 小说，使用本地 OCR 识别漫画文字，结合在线翻译服务或本地 llama.cpp 模型生成译文，并把译文按原文版式覆盖回页面。",
             "软件采用 Stage 模型与多 HAR 模块架构：entry 负责页面与交互，coremodel 负责数据模型，coreocr 负责文字识别，coretranslate 负责翻译引擎，corerender 负责排版绘制，corenovel 负责小说解析。",
             "软件的主要目标是把漫画翻译流程从多步手工操作收敛为：导入、阅读、翻译、校对、导出。",
         ]),
@@ -305,7 +305,7 @@ def write_manual(out_docx: Path) -> None:
             "网络环境：使用在线翻译时需要网络；本地 OCR 与本地翻译可离线运行。",
         ]),
         ("3 安装与启动", [
-            "通过应用商店或调试安装 HAP 后，桌面出现“星译 StarFlow”图标。首次启动进入书架页，底部为书架、翻译、历史、我的四个入口。",
+            "通过应用商店或调试安装 HAP 后，桌面出现“墨译 Moyi”图标。首次启动进入书架页，底部为书架、翻译、历史、我的四个入口。",
             "首次使用漫画翻译前，需要在“设置 → OCR”下载本地 PP-OCRv6 检测与识别模型；使用本地翻译时，需要在“模型管理”导入 GGUF 翻译模型。",
             "软件不强制注册账号，书籍、阅读进度、术语表、翻译记忆和偏好保存在本机。",
         ]),
@@ -398,13 +398,13 @@ def write_manual(out_docx: Path) -> None:
 def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -> None:
     readme = """# 软件著作权申请材料包
 
-本目录为 **星译漫画小说智能翻译软件 V1.1.0** 的软著申请准备材料。
+本目录为 **墨译漫画小说智能翻译软件 V1.1.0** 的软著申请准备材料。
 
 ## 先填三项
 
-1. 申请人：个人姓名 / 公司全称（替换所有“【申请人名称，待填】”）。
-2. 软件全称：建议“星译漫画小说智能翻译软件”，如商标检索有冲突再改名。
-3. 开发完成日期：当前材料按 2026-10-31 编制，按实际填写。
+1. 申请人：薛朝坤（已填入；如公司申请需整体替换）。
+2. 软件全称：墨译漫画小说智能翻译软件（如商标检索有冲突再改名）。
+3. 开发完成日期：2026-10-31；应用尚未上架，首次发表日期按“未发表”处理。
 
 ## 文件清单
 
@@ -457,16 +457,16 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 
 | 字段 | 建议填写 | 说明 |
 |---|---|---|
-| 软件全称 | 星译漫画小说智能翻译软件 | 与说明书、源程序页眉一致；如商标冲突再改 |
-| 软件简称 | 星译 | 可选 |
+| 软件全称 | 墨译漫画小说智能翻译软件 | 与说明书、源程序页眉一致；如商标冲突再改 |
+| 软件简称 | 墨译 | 可选 |
 | 版本号 | V1.1.0 | 与 AppScope/app.json5 的 versionName 对应 |
 | 软件分类 | 应用软件 / 图像处理与翻译工具 | 以系统选项为准 |
 | 开发方式 | 独立开发 | 如合作/委托/职务开发，另附权属证明 |
 | 权利取得方式 | 原始取得 | 受让/继承需附合同或证明 |
-| 开发完成日期 | 2026-10-31（按实际改） | 必须早于或等于申请日 |
-| 首次发表日期 | 未发表（如已公开上架则填实际日期） | 仅在公开发表后填写 |
-| 发表地点 | 中国 | 未发表可不填 |
-| 著作权人 | 【申请人名称，待填】 | 个人身份证姓名 / 公司营业执照全称 |
+| 开发完成日期 | 2026-10-31 | 必须早于或等于申请日 |
+| 首次发表日期 | 未发表（应用尚未上架） | 仅在公开发表后填写 |
+| 发表地点 | 中国（计划上架华为应用市场） | 未发表可不填 |
+| 著作权人 | 薛朝坤 | 个人申请，身份证姓名 |
 | 证件类型/号码 | 【待填】 | 个人身份证 / 统一社会信用代码 |
 | 联系人/电话/邮箱 | 【待填】 | 受理通知使用 |
 | 地址/邮编 | 【待填】 | 证书邮寄/联系 |
@@ -513,19 +513,24 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 
 ## 四、权属与材料
 
-- 申请人类型：个人 / 公司（待定）
+- 申请人类型：个人（薛朝坤）
 - 是否职务开发：是 / 否（如“是”，需单位出具权属说明）
 - 是否委托/合作开发：是 / 否（如“是”，需合同）
 - 是否使用第三方开源：是（见 03 清单）
 - 是否包含第三方模型：不随安装包分发；用户自行下载/导入
 
-## 五、待确认
+## 五、目标渠道
 
-- [ ] 申请人全称与证件信息
+- 华为应用市场（HarmonyOS NEXT），当前未上架。
+
+## 六、待确认
+
+- [x] 申请人：薛朝坤（个人）
+- [ ] 身份证号码、地址、电话、邮箱
 - [ ] 软件名称商标检索
 - [ ] 开发完成日期
-- [ ] 是否已公开发表
-- [ ] 上游 StarFlow 是否存在代码/素材复制
+- [x] 当前未上架；计划上架华为应用市场
+- [ ] 上游 StarFlow（星译）是否存在代码/素材复制
 - [ ] 第三方模型许可是否允许当前分发方式
 """.replace("__SOURCE_TOTAL__", str(source_total))
     (OUT / "00-申请信息表.md").write_text(info, encoding="utf-8")
@@ -549,7 +554,7 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 
 | 模型 | 获取方式 | 用途 | 许可状态 |
 |---|---|---|---|
-| PP-OCRv6 det/rec | 应用内下载 | 本地 OCR | 当前下载地址指向上游 StarFlow 仓库；需核实模型许可与再分发条件 |
+| PP-OCRv6 det/rec | 应用内下载 | 本地 OCR | PaddlePaddle 官方 PP-OCRv6 small ONNX，Apache-2.0；从 HF 国内镜像下载（已实测 6 行） |
 | Hy-MT2 GGUF | 用户导入/下载 | 本地翻译 | 以模型发布方许可为准；商用需单独确认 |
 
 **软著申请口径：**
@@ -558,7 +563,19 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 - 说明书中描述“用户自行下载/导入”，不声称模型为申请人原创；
 - 若申请材料包含模型加载/推理代码，该部分代码属于软件作品，模型权重不属于。
 
-## 三、上游 StarFlow
+## 三、上游 StarFlow（星译）
+
+### 3.1 OCR 模型官方来源
+
+- 官方模型：PaddlePaddle PP-OCRv6 small det/rec ONNX
+- 仓库：https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx
+- 仓库：https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx
+- 许可：Apache-2.0
+- 归属：百度飞桨（PaddlePaddle）官方组织
+- 应用内下载：https://hf-mirror.com/PaddlePaddle/...
+- 结论：不再引用上游 StarFlow 的模型文件；模型不随安装包分发。
+
+### 3.2 上游代码/素材
 
 - 上游：https://github.com/xujunjiex/StarFlow （LGPL-3.0）
 - 本项目声明为 HarmonyOS 独立实现，但功能信息架构与交互概念参照上游。
@@ -568,6 +585,7 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
   - [ ] 是否直接使用上游模型文件；
   - [ ] 是否保留上游版权/许可声明。
 - 如存在复制：取得许可或删除后重新实现，不能作为“纯原创”申请。
+- 本清单生成后，应用内 OCR 模型已切换为 PaddlePaddle 官方来源，并在模拟器完成 6 行识别验证。
 
 ## 四、AI 辅助开发说明
 
@@ -595,13 +613,13 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 
 ## 声明人
 
-- 姓名/单位：____________________
+- 姓名：薛朝坤
 - 证件类型/号码：____________________
 - 联系地址：____________________
 
 ## 声明事项
 
-本人/本单位就“星译漫画小说智能翻译软件 V1.1.0”（以下简称“本软件”）声明如下：
+本人/本单位就“墨译漫画小说智能翻译软件 V1.1.0”（以下简称“本软件”）声明如下：
 
 1. 本软件由声明人组织/独立开发，开发过程真实，源代码、文档和构建产物来源于本项目仓库。
 2. 本软件未通过反编译、破解、复制等方式使用他人软件代码；除已列明的第三方开源组件和模型外，未将他人代码或素材作为自己的原创成果申请登记。
@@ -671,9 +689,9 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 ## 四、文件命名建议
 
 ~~~text
-星译漫画小说智能翻译软件V1.1.0-源程序鉴别材料.pdf
-星译漫画小说智能翻译软件V1.1.0-软件说明书.pdf
-星译漫画小说智能翻译软件V1.1.0-申请确认签章页.pdf
+墨译漫画小说智能翻译软件V1.1.0-源程序鉴别材料.pdf
+墨译漫画小说智能翻译软件V1.1.0-软件说明书.pdf
+墨译漫画小说智能翻译软件V1.1.0-申请确认签章页.pdf
 ~~~
 
 ## 五、提交后保存
@@ -689,17 +707,17 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 ## 当前事实（来自仓库）
 
 - AppScope/app.json5：
-  - bundleName：com.moe.starflow
+  - bundleName：com.xuezhaokun.moyi
   - versionName：1.1.0
   - versionCode：1010000
-- 桌面名称：星译 StarFlow
+- 桌面名称：墨译 Moyi
 - 仓库许可证：LGPL-3.0
 - 主要语言：ArkTS、C++
 
 ## 建议申请名称
 
-- 软件全称：**星译漫画小说智能翻译软件**
-- 软件简称：**星译**
+- 软件全称：**墨译漫画小说智能翻译软件**
+- 软件简称：**墨译**
 - 版本号：**V1.1.0**
 
 ## 需要统一的位置
@@ -713,9 +731,9 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 
 ## 商标/名称风险
 
-“星译 / StarFlow”与上游项目同名。申请软著不要求商标注册，但上架/商用前应：
+“墨译 / Moyi”与上游项目 StarFlow（星译）不是同一名称。申请软著不要求商标注册，但上架/商用前应：
 
-1. 在中国商标网检索“星译”“StarFlow”在第 9 类（软件）、第 42 类（软件服务）的注册情况；
+1. 在中国商标网检索“墨译”“Moyi”在第 9 类（软件）、第 42 类（软件服务）的注册情况；
 2. 检索应用商店是否已有同名应用；
 3. 如冲突，准备备用名并同步修改申请材料；
 4. 不要使用与上游相同/近似的图标和视觉标识。
@@ -733,7 +751,7 @@ def write_markdown_docs(source_total: int, sample_lines: int, file_count: int) -
 ## P0：影响软著申请
 
 - [ ] 确认申请人/权属（个人、公司、职务/委托/合作）。
-- [ ] 核对上游 StarFlow 是否存在代码/素材复制；如有，取得许可或重写。
+- [ ] 核对上游 Moyi 是否存在代码/素材复制；如有，取得许可或重写。
 - [ ] 核对 PP-OCRv6 / Hy-MT2 模型许可，停止使用来源不明的下载地址。
 - [ ] 补全 NOTICE 与第三方组件许可文本。
 - [ ] 清理源程序样本中的密钥、密码、个人信息。

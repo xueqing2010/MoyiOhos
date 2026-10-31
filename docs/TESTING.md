@@ -49,7 +49,7 @@
 ## 复现命令
 
 ```bash
-cd StarFlowOhos
+cd MoyiOhos
 devecocli signature generate --force   # 仅首次/换证书时
 devecocli build --modules entry --build-mode debug
 devecocli device unlock --device 2BD0223929003920

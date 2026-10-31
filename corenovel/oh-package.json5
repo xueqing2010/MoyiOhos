@@ -1,7 +1,7 @@
 {
   "name": "corenovel",
   "version": "1.0.0",
-  "description": "StarFlow novel parsing: TXT/EPUB/ZIP-HTML, chapter split, paginator",
+  "description": "Moyi novel parsing: TXT/EPUB/ZIP-HTML, chapter split, paginator",
   "main": "Index.ets",
   "author": "",
   "license": "Apache-2.0",

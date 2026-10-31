@@ -1,8 +1,8 @@
-# 案例复盘：星译 StarFlow（HarmonyOS）
+# 案例复盘：墨译 Moyi（HarmonyOS）
 
 ## 1. 项目背景
 
-- 上游：Android「星译 StarFlow」，LGPL-3.0。
+- 上游：Android「StarFlow（星译）」，LGPL-3.0。
 - 目标：HarmonyOS NEXT 上以 ArkTS 独立实现，功能对齐，适配 Phone/Tablet/2in1。
 - 设备：PCE-W30 真机（API 26，2880×1920），Mate 90 Pro / MatePad Pro 13 模拟器。
 - 工具：DevEco Studio 6、devecocli、API 26 SDK。

@@ -48,7 +48,7 @@ function makeBox(w: number, h: number): DisplayRect {
 }
 
 export default function localUnitTest() {
-  describe('StarFlow local unit tests', () => {
+  describe('Moyi local unit tests', () => {
     // ---------- T044: coordinate mapping ----------
     it('containFit_scales_and_centers', 0, () => {
       const fit = containFit(100, 200, 100, 100);

@@ -53,7 +53,7 @@ export class HistoryExportService {
     }
     HistoryExportService.notify(onProgress, 1, 1);
     const content = HistoryExportService.buildNovelText(group);
-    const fileName = HistoryExportService.safeName('星译-小说-' + group.title) + '.txt';
+    const fileName = HistoryExportService.safeName('墨译-小说-' + group.title) + '.txt';
     const result = await HistoryExportService.saveTextFile(fileName, content);
     result.exported = group.items.length;
     result.fileName = fileName;
@@ -70,7 +70,7 @@ export class HistoryExportService {
     }
     HistoryExportService.notify(onProgress, 1, 1);
     const content = HistoryExportService.buildTextsText(group);
-    const fileName = HistoryExportService.safeName('星译-文本-' + HistoryService.dayKey(group.latestTime)) + '.txt';
+    const fileName = HistoryExportService.safeName('墨译-文本-' + HistoryService.dayKey(group.latestTime)) + '.txt';
     const result = await HistoryExportService.saveTextFile(fileName, content);
     result.exported = group.items.length;
     result.fileName = fileName;
@@ -82,7 +82,7 @@ export class HistoryExportService {
   // -------------------------------------------------------------------------
 
   private static buildNovelText(group: HistoryGroup): string {
-    let text = '星译 · 小说翻译历史导出\n';
+    let text = '墨译 · 小说翻译历史导出\n';
     text += '书名：' + group.title + '\n';
     text += '导出时间：' + HistoryService.formatDateTime(Date.now()) + '\n';
     text += '章节数：' + group.items.length + ' 章\n';
@@ -105,7 +105,7 @@ export class HistoryExportService {
   }
 
   private static buildTextsText(group: HistoryGroup): string {
-    let text = '星译 · 文本翻译历史导出\n';
+    let text = '墨译 · 文本翻译历史导出\n';
     text += '导出时间：' + HistoryService.formatDateTime(Date.now()) + '\n';
     text += '记录数：' + group.items.length + ' 条\n';
     text += '========================================\n\n';

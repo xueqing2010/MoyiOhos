@@ -427,7 +427,7 @@ export struct SettingsOcrPage {
               ForEach(this.models, (info: OcrModelInfo) => {
                 this.modelRow(info)
               }, (info: OcrModelInfo) => info.key)
-              Text('模型来自上游 StarFlow（LGPL-3.0）的 ppocrv6 assets；字典随包分发，首次加载模型约需数秒。')
+              Text('模型来自 PaddlePaddle 官方 PP-OCRv6 small ONNX（Apache-2.0）；字典随包分发，首次加载模型约需数秒。')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)
                 .width('100%')

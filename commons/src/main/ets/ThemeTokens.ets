@@ -1,5 +1,5 @@
 /**
- * StarFlow HarmonyOS design tokens — 蓝白 / 蓝黑（默认蓝白）.
+ * Moyi HarmonyOS design tokens — 蓝白 / 蓝黑（默认蓝白）.
  * 已移除紫色主题；token 名称保持不变，页面无需改动。
  */
 export type ThemeMode = 'blue' | 'blueDark';

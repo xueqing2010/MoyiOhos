@@ -1,7 +1,7 @@
 {
   "name": "libocrasync",
   "version": "1.0.0",
-  "description": "ONNX Runtime native OCR rec bridge (StarFlowOhos)",
+  "description": "ONNX Runtime native OCR rec bridge (MoyiOhos)",
   "main": "",
   "author": "",
   "license": "",

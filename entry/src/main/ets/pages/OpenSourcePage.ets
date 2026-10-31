@@ -38,7 +38,7 @@ struct OssCard {
 }
 
 /**
- * 开源致谢页（S110）：上游 StarFlow（LGPL-3.0）、llama.cpp（MIT）、
+ * 开源致谢页（S110）：上游 StarFlow（星译，LGPL-3.0）、llama.cpp（MIT）、
  * HarmonyOS Core Vision Kit 与预置模型来源说明。
  * 所有链接以可长按复制的文本展示，不内置浏览器跳转。
  */
@@ -132,7 +132,7 @@ export struct OpenSourcePage {
                 .fontSize(ThemeTokens.FONT_TITLE)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(ThemeTokens.TEXT_PRIMARY)
-              Text('星译站在这些开源项目与系统能力的肩膀上')
+              Text('墨译站在这些开源项目与系统能力的肩膀上')
                 .fontSize(ThemeTokens.FONT_SMALL)
                 .fontColor(ThemeTokens.TEXT_HINT)
             }
@@ -145,7 +145,7 @@ export struct OpenSourcePage {
                   .fontSize(ThemeTokens.FONT_CAPTION)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(ThemeTokens.TEXT_PRIMARY)
-                Text('本应用参照上游 StarFlow（LGPL-3.0）的功能与视觉设计，在 HarmonyOS 平台以 ArkTS 独立实现；应用本身不分发上游二进制。第三方组件与模型分别遵循其各自许可，链接可长按复制。')
+                Text('本应用参照上游 StarFlow（星译，LGPL-3.0）的功能与视觉设计，在 HarmonyOS 平台以 ArkTS 独立实现；应用本身不分发上游二进制。第三方组件与模型分别遵循其各自许可，链接可长按复制。')
                   .fontSize(ThemeTokens.FONT_SMALL)
                   .fontColor(ThemeTokens.TEXT_SECONDARY)
                   .lineHeight(19)
@@ -192,7 +192,7 @@ export struct OpenSourcePage {
             }
             .width('100%')
 
-            Text('说明：上游 StarFlow 为 Android 开源项目；本应用为 HarmonyOS 迁移实现，行为与视觉参照上游，代码为独立编写。')
+            Text('说明：上游 StarFlow（星译）为 Android 开源项目；本应用为 HarmonyOS 迁移实现，行为与视觉参照上游，代码为独立编写。')
               .fontSize(ThemeTokens.FONT_SMALL)
               .fontColor(ThemeTokens.TEXT_TERTIARY)
               .width('100%')

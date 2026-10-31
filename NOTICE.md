@@ -1,7 +1,7 @@
 # NOTICE
 
-**StarFlowOhos（星译 StarFlow · HarmonyOS）**
-Copyright (C) 2026 xueqing2010 and contributors
+**MoyiOhos（墨译 Moyi · HarmonyOS）**
+Copyright (C) 2026 薛朝坤
 
 本仓库以 GNU Lesser General Public License v3.0（LGPL-3.0）发布，完整许可文本见 [LICENSE](LICENSE)。
 
@@ -33,8 +33,18 @@ Copyright (C) 2026 xueqing2010 and contributors
 
 ## 模型
 
-本仓库**不包含任何 GGUF 模型文件**。用户自行下载或导入的模型遵循其各自发布方的许可
+本仓库**不包含任何 GGUF / ONNX 模型文件**。用户自行下载或导入的模型遵循其各自发布方的许可
 （例如 Hy-MT2 模型许可归模型发布方所有）。
+
+### PP-OCRv6（应用内下载）
+
+- 来源：PaddlePaddle 官方 HuggingFace
+  - https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx
+  - https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx
+- 许可证：Apache-2.0
+- 归属：百度飞桨（PaddlePaddle）官方组织
+- 应用内下载镜像：https://hf-mirror.com/PaddlePaddle/...
+- 说明：不再引用上游 StarFlow 仓库的模型文件；模型不随安装包分发。
 
 ## 图标与视觉资源
 

@@ -63,8 +63,8 @@ setTimeout(() => {
 - 不要把模型打进 HAP（体积大、许可复杂），首次使用下载。
 
 已知可用（以项目代码为准）：
-- det：`https://cdn.jsdelivr.net/gh/xujunjiex/StarFlow@master/app/src/main/assets/ppocrv6/det_v6_small.onnx`
-- rec：`https://gh-proxy.com/https://raw.githubusercontent.com/xujunjiex/StarFlow/master/app/src/main/assets/ppocrv6/rec_v6_small.onnx`
+- det：`https://cdn.jsdelivr.net/gh/xujunjiex/Moyi@master/app/src/main/assets/ppocrv6/det_v6_small.onnx`
+- rec：`https://gh-proxy.com/https://raw.githubusercontent.com/xujunjiex/Moyi/master/app/src/main/assets/ppocrv6/rec_v6_small.onnx`
 
 ### 下载器
 - 下载到 `cacheDir/downloads/*.part`；

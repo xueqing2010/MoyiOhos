@@ -62,7 +62,7 @@ export struct FaqPage {
     new FaqItem('其他', '如何重新查看启动引导？',
       '「我的 → 关于 → 重新查看引导」，或直接打开「我的」页底部的「重新查看引导」入口。'),
     new FaqItem('其他', '开源许可是什么？',
-      '上游 StarFlow 为 LGPL-3.0；本地推理使用 llama.cpp（MIT）；OCR 使用 HarmonyOS Core Vision Kit 系统能力。详见「开源致谢」。')
+      '上游 StarFlow（星译）为 LGPL-3.0；本地推理使用 llama.cpp（MIT）；OCR 使用 HarmonyOS Core Vision Kit 系统能力。详见「开源致谢」。')
   ];
 
   aboutToAppear(): void {
@@ -159,7 +159,7 @@ export struct FaqPage {
             .borderRadius(ThemeTokens.RADIUS_CARD)
             .backgroundColor(ThemeTokens.CARD_BG)
 
-            Text('没有找到答案？可到上游开源项目提交 issue，或在应用内「我的 → 关于星译」查看构建与版本信息。')
+            Text('没有找到答案？可到上游开源项目提交 issue，或在应用内「我的 → 关于墨译」查看构建与版本信息。')
               .fontSize(ThemeTokens.FONT_SMALL)
               .fontColor(ThemeTokens.TEXT_TERTIARY)
               .width('100%')

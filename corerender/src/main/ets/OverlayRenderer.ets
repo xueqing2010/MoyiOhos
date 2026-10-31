@@ -41,11 +41,11 @@ export class OverlayRenderer {
    * 所以屏幕路径要把 vp 字号换算成 px；导出 PX 画布本来就是 px，直接使用。
    */
   static fontOf(fontSize: number, fontUnit: string): string {
-    // 内置 Noto Sans CJK SC，由 Index.aboutToAppear 注册为 StarFlowSans。
+    // 内置 Noto Sans CJK SC，由 Index.aboutToAppear 注册为 MoyiSans。
     if (fontUnit === 'px') {
-      return fontSize + 'px StarFlowSans';
+      return fontSize + 'px MoyiSans';
     }
-    return vp2px(fontSize) + 'px StarFlowSans';
+    return vp2px(fontSize) + 'px MoyiSans';
   }
 
   /** White base block covering the bubble area (display/page coords). */

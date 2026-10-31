@@ -4,8 +4,8 @@
  * presents this manifest statically (plan D14).
  */
 export class BuildInfo {
-  static readonly APP_NAME: string = '星译 StarFlow';
-  static readonly BUNDLE_NAME: string = 'com.moe.starflow';
+  static readonly APP_NAME: string = '墨译 Moyi';
+  static readonly BUNDLE_NAME: string = 'com.xuezhaokun.moyi';
   static readonly APP_VERSION: string = '1.1.0';
   static readonly HARMONY_API_LEVEL: string = '26';
   static readonly BUILD_DATE: string = '2026-10-25';

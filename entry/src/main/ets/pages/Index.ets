@@ -62,7 +62,7 @@ struct Index {
 
   aboutToAppear(): void {
     try {
-      font.registerFont({ familyName: 'StarFlowSans', familySrc: $rawfile('fonts/NotoSansSC.otf') });
+      font.registerFont({ familyName: 'MoyiSans', familySrc: $rawfile('fonts/NotoSansSC.otf') });
     } catch (e) {
       Log.warn('Index', 'register custom font failed: ' + e);
     }
@@ -257,11 +257,11 @@ struct Index {
             .width(34)
             .height(34)
           Column({ space: 1 }) {
-            Text('星译')
+            Text('墨译')
               .fontSize(18)
               .fontWeight(FontWeight.Bold)
               .fontColor(ThemeTokens.TEXT_PRIMARY)
-            Text('StarFlow · HarmonyOS')
+            Text('Moyi · HarmonyOS')
               .fontSize(9)
               .fontColor(ThemeTokens.TEXT_HINT)
           }

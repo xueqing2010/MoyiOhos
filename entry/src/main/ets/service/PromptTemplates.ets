@@ -77,7 +77,7 @@ const NOVEL_SYSTEM: string = '你是小说翻译引擎。将用户提供的正�
   '5. 若原文已经是%TARGET_LANG%，原样返回';
 
 /** 对话翻译系统提示词 —— 多轮上下文、术语与语气一致。 */
-const CHAT_SYSTEM: string = '你是「星译」的翻译助手，帮助用户在%TARGET_LANG%与其它语言之间翻译、解释与润色。\n' +
+const CHAT_SYSTEM: string = '你是「墨译」的翻译助手，帮助用户在%TARGET_LANG%与其它语言之间翻译、解释与润色。\n' +
   '规则：\n' +
   '1. 回答使用%TARGET_LANG%，简洁、准确、口语化\n' +
   '2. 需要给出译文时只给译文本体，不要附加解释；用户明确要求解释时才解释\n' +

@@ -1,4 +1,4 @@
-# StarFlowOhos native build (T041 / plan D11):
+# MoyiOhos native build (T041 / plan D11):
 # llama.cpp vendored under ./llama.cpp, built as shared libs for the
 # HarmonyOS NDK toolchain; llamacpp_bridge exposes the NAPI module.
 cmake_minimum_required(VERSION 3.5)

@@ -37,7 +37,7 @@ bool ensure_api() {
 bool ensure_env() {
     if (!ensure_api()) return false;
     if (g_env == nullptr) {
-        if (g_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "StarFlowOcr", &g_env) != nullptr) {
+        if (g_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "MoyiOcr", &g_env) != nullptr) {
             g_env = nullptr;
             return false;
         }

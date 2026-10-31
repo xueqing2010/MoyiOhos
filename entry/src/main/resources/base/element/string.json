@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "StarFlow comic translation workbench for HarmonyOS"
+      "value": "Moyi comic translation workbench for HarmonyOS"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "星译：漫画·小说·文本翻译"
+      "value": "墨译：漫画·小说·文本翻译"
     },
     {
       "name": "EntryAbility_label",
-      "value": "星译 StarFlow"
+      "value": "墨译 Moyi"
     },
     {
       "name": "tab_shelf",
@@ -125,7 +125,7 @@
     { "name": "tab_shelf_books", "value": "Shelf" },
     { "name": "tab_shelf_manga", "value": "Comics" },
     { "name": "tab_shelf_novel", "value": "Novels" },
-    { "name": "app_title", "value": "StarFlow" },
+    { "name": "app_title", "value": "Moyi" },
     { "name": "app_slogan", "value": "Comics · Novels · Text translation" }
   ]
 }

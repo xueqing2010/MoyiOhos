@@ -1,4 +1,4 @@
-// StarFlowOhos llama.cpp NAPI bridge (T041 / plan D11).
+// MoyiOhos llama.cpp NAPI bridge (T041 / plan D11).
 // Exposes: getVersion / loadModel / generate(streaming via
 // napi_threadsafe_function) / stopGeneration / unloadModel.
 //
@@ -175,7 +175,7 @@ void run_generation(napi_env env, napi_threadsafe_function tsfn, ModelEntry * en
 
 napi_value get_version(napi_env env, napi_callback_info info) {
     napi_value result = nullptr;
-    const char * text = "llama.cpp (StarFlowOhos NAPI bridge)";
+    const char * text = "llama.cpp (MoyiOhos NAPI bridge)";
     napi_create_string_utf8(env, text, NAPI_AUTO_LENGTH, &result);
     return result;
 }

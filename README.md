@@ -1,6 +1,6 @@
-# 星译 StarFlow（HarmonyOS）
+# 墨译 Moyi（HarmonyOS）
 
-星译 StarFlow 是一个运行在 HarmonyOS 上的**漫画 / 小说 / 文本翻译工作台**：识别屏幕或图片中的文字，翻译后以覆盖层重新排版渲染回原图，同时提供小说阅读与整章翻译能力。翻译既可以走在线接口，也可以完全在端侧用内置的 llama.cpp 完成。
+墨译 Moyi 是一个运行在 HarmonyOS 上的**漫画 / 小说 / 文本翻译工作台**：识别屏幕或图片中的文字，翻译后以覆盖层重新排版渲染回原图，同时提供小说阅读与整章翻译能力。翻译既可以走在线接口，也可以完全在端侧用内置的 llama.cpp 完成。
 
 适配 **Phone / Tablet / 2in1**：手机使用底部沉浸光感 Tab，平板与宽屏自动切换左侧导航轨和双列/双页布局。
 
@@ -53,8 +53,8 @@
 ## 工程结构
 
 ```
-StarFlowOhos/
-├── AppScope/                # 应用级配置（bundleName: com.moe.starflow）
+MoyiOhos/
+├── AppScope/                # 应用级配置（bundleName: com.xuezhaokun.moyi）
 ├── entry/                   # 主 HAP 模块：页面、视图、服务、C++ 推理
 │   └── src/main/cpp/        # llama.cpp 及 JNI 封装
 ├── commons/                 # 主题 token、日志、自然排序等公共工具
@@ -76,6 +76,11 @@ StarFlowOhos/
 - 其余为零星 C++ NAPI 桥接、SVG 图标与工程配置。
 
 ## 构建与运行
+
+```bash
+git clone https://github.com/xueqing2010/MoyiOhos.git
+cd MoyiOhos
+```
 
 1. 安装 **DevEco Studio**（需要 HarmonyOS SDK **26.0.0**，`compatibleSdkVersion` / `targetSdkVersion` 均为 `26.0.0`）
 2. 用 DevEco Studio 打开本目录，等待 `hvigor` 同步依赖（`ohpm install`）
@@ -99,7 +104,7 @@ hvigorw assembleHap --mode module -p product=default
 
 ```bash
 devecocli auth login --no-prompt
-cd /Users/kong/Desktop/StarFlowOhos
+cd /Users/kong/Desktop/MoyiOhos
 devecocli signature generate --force
 ```
 
@@ -121,6 +126,7 @@ devecocli signature generate --force
 
 - [docs/TESTING.md](docs/TESTING.md)：真机/模拟器测试记录、性能数据与已知限制
 - [docs/BENCHMARK.md](docs/BENCHMARK.md)：OCR/翻译/排版质量与性能基准方法
+- [docs/OCR_MODEL_SOURCE.md](docs/OCR_MODEL_SOURCE.md)：PP-OCRv6 官方来源、许可与哈希核对
 - [softcopyright/README.md](softcopyright/README.md)：软件著作权申请材料包（说明书、源程序样本、权属/清单模板）
 - [docs/images](docs/images/)：演示截图索引
 - [skills/harmonyos-arkts-app-dev](skills/harmonyos-arkts-app-dev/)：本项目的全流程开发 skill 与坑位复盘

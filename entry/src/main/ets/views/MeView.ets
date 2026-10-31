@@ -84,11 +84,11 @@ export struct MeView {
       makeEntry('常见问题', '引擎、模型、OCR、导入与隐私的疑问排查', $r('app.media.ic_faq'), Routes.FAQ)
     ]));
     groups.push(makeGroup('开源致谢', $r('app.media.ic_github'), [
-      makeEntry('开源致谢', '上游 StarFlow（LGPL-3.0）、llama.cpp 与系统能力', $r('app.media.ic_github'),
+      makeEntry('开源致谢', '上游 StarFlow（星译，LGPL-3.0）、llama.cpp 与系统能力', $r('app.media.ic_github'),
         Routes.OPEN_SOURCE)
     ]));
     groups.push(makeGroup('关于', $r('app.media.ic_about'), [
-      makeEntry('关于星译', '版本、构建模块清单与许可说明', $r('app.media.ic_about'), Routes.ABOUT),
+      makeEntry('关于墨译', '版本、构建模块清单与许可说明', $r('app.media.ic_about'), Routes.ABOUT),
       makeEntry('重新查看引导', '3 页快速上手：导入、格式与引擎', $r('app.media.ic_star'), Routes.ONBOARDING)
     ]));
     return groups;
@@ -118,7 +118,7 @@ export struct MeView {
         .borderRadius(16)
       Column({ space: 4 }) {
         Row({ space: 8 }) {
-          Text('星译')
+          Text('墨译')
             .fontSize(ThemeTokens.FONT_DISPLAY)
             .fontWeight(FontWeight.Bold)
             .fontColor(ThemeTokens.TEXT_PRIMARY)

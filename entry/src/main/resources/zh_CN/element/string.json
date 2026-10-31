@@ -6,11 +6,11 @@
     },
     {
       "name": "EntryAbility_desc",
-      "value": "星译：漫画·小说·文本翻译"
+      "value": "墨译：漫画·小说·文本翻译"
     },
     {
       "name": "EntryAbility_label",
-      "value": "星译 StarFlow"
+      "value": "墨译 Moyi"
     },
     {
       "name": "tab_shelf",
@@ -125,7 +125,7 @@
     { "name": "tab_shelf_books", "value": "书架" },
     { "name": "tab_shelf_manga", "value": "漫画" },
     { "name": "tab_shelf_novel", "value": "小说" },
-    { "name": "app_title", "value": "星译" },
+    { "name": "app_title", "value": "墨译" },
     { "name": "app_slogan", "value": "漫画 · 小说 · 文本翻译" }
   ]
 }

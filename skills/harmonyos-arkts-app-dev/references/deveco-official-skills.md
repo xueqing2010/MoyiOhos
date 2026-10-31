@@ -75,7 +75,7 @@ DevEco 通过 `devecocli skills` 提供 49 个官方 HarmonyOS Skills。本项�
 ## 与本 skill 的分工
 
 - **官方 skill**：具体 API 签名、错误码、官方规范、DFX 诊断流程；
-- **本 skill**：StarFlow 实战顺序、模块拆分、OCR/翻译/本地模型、AGC 踩坑、真机验收与提效命令。
+- **本 skill**：Moyi 实战顺序、模块拆分、OCR/翻译/本地模型、AGC 踩坑、真机验收与提效命令。
 
 写代码时优先让官方 skill 提供“准确签名”，本 skill 提供“工程落地顺序和坑”。
 

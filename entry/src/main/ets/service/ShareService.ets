@@ -55,7 +55,7 @@ export class ShareService {
       utd: uniformTypeDescriptor.UniformDataType.IMAGE,
       uri: fileUri.getUriFromPath(paths[0]),
       title: manga.name + ' · 第 1 页',
-      description: '来自星译 StarFlow 的漫画页面',
+      description: '来自墨译 Moyi 的漫画页面',
       label: 'IMAGE'
     };
     const data = new systemShare.SharedData(first);
@@ -64,7 +64,7 @@ export class ShareService {
         utd: uniformTypeDescriptor.UniformDataType.IMAGE,
         uri: fileUri.getUriFromPath(paths[i]),
         title: manga.name + ' · 第 ' + (i + 1) + ' 页',
-        description: '来自星译 StarFlow 的漫画页面',
+        description: '来自墨译 Moyi 的漫画页面',
         label: 'IMAGE'
       });
     }

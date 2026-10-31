@@ -1,7 +1,7 @@
 {
   "app": {
-    "bundleName": "com.moe.starflow",
-    "vendor": "StarFlowOhos",
+    "bundleName": "com.xuezhaokun.moyi",
+    "vendor": "Xue Zhaokun",
     "versionCode": 1010000,
     "versionName": "1.1.0",
     "icon": "$media:layered_image",

@@ -20,7 +20,7 @@
 - P1-7：新增全局术语表导入（JSON）+ 翻译前最长优先替换 + 页级翻译记忆（最多 2000 条）。
 - P1-8：长按气泡打开译文校对框，保存后更新 page_translation 并立即重绘；合并块暂不支持逐行编辑。
 - P1-9：导出 PDF（HMS PDFKit），按译文合成页生成；模拟器验证生成约 26KB PDF 并保存到应用 exports 目录。
-- P0-3：内置 Noto Sans CJK SC，注册为 StarFlowSans，覆盖层/导出统一使用；HAP 体积增加约 16MB。
+- P0-3：内置 Noto Sans CJK SC，注册为 MoyiSans，覆盖层/导出统一使用；HAP 体积增加约 16MB。
 - GGUF 翻译模型改用 ModelScope 国内镜像，实测 21.9MB/s。
 - 修复模型管理存储统计为 0B（mkdir EEXIST）并纳入缓存分片。
 
