@@ -15,7 +15,7 @@ export class PageImageCleaner {
 
   static cleanPath(pageId: number): string {
     const ctx = AppEnv.getInstance().getContext();
-    return ctx.cacheDir + '/clean/page_' + pageId + '_v4.jpg';
+    return ctx.cacheDir + '/clean/page_' + pageId + '_v6.jpg';
   }
 
   static async ensure(pageId: number, imagePath: string,
@@ -137,7 +137,7 @@ export class PageImageCleaner {
         || (region.text.length <= 2 && box.w * box.h > pageArea * 0.04)) {
         continue;
       }
-      const pad = 2;
+      const pad = 4;
       const x0 = Math.max(2, Math.floor(box.x) - pad);
       const y0 = Math.max(2, Math.floor(box.y) - pad);
       const x1 = Math.min(w - 2, Math.ceil(box.x + box.w) + pad);
@@ -145,6 +145,7 @@ export class PageImageCleaner {
       if (x1 <= x0 || y1 <= y0) {
         continue;
       }
+      const horizontal = box.w >= box.h;
       const left = PageImageCleaner.avgColumn(rgba, w, x0 - 1, y0, y1);
       const right = PageImageCleaner.avgColumn(rgba, w, x1 + 1, y0, y1);
       const top = PageImageCleaner.avgRow(rgba, w, y0 - 1, x0, x1);
@@ -156,15 +157,20 @@ export class PageImageCleaner {
         for (let x = x0; x <= x1; x++) {
           const tx = dw === 0 ? 0.5 : (x - x0) / dw;
           const i = (y * w + x) * 4;
-          const horizR = left[0] * (1 - tx) + right[0] * tx;
-          const horizG = left[1] * (1 - tx) + right[1] * tx;
-          const horizB = left[2] * (1 - tx) + right[2] * tx;
-          const vertR = top[0] * (1 - ty) + bottom[0] * ty;
-          const vertG = top[1] * (1 - ty) + bottom[1] * ty;
-          const vertB = top[2] * (1 - ty) + bottom[2] * ty;
-          rgba[i] = Math.round((horizR + vertR) * 0.5);
-          rgba[i + 1] = Math.round((horizG + vertG) * 0.5);
-          rgba[i + 2] = Math.round((horizB + vertB) * 0.5);
+          // 横排文字用左右两侧底色插值，竖排文字用上下两侧；
+          // 避免把靠近文字的上/下边黑像素混进填充色，形成灰条。
+          const cR = horizontal
+            ? top[0] * (1 - ty) + bottom[0] * ty
+            : left[0] * (1 - tx) + right[0] * tx;
+          const cG = horizontal
+            ? top[1] * (1 - ty) + bottom[1] * ty
+            : left[1] * (1 - tx) + right[1] * tx;
+          const cB = horizontal
+            ? top[2] * (1 - ty) + bottom[2] * ty
+            : left[2] * (1 - tx) + right[2] * tx;
+          rgba[i] = Math.round(cR);
+          rgba[i + 1] = Math.round(cG);
+          rgba[i + 2] = Math.round(cB);
           rgba[i + 3] = 255;
         }
       }
