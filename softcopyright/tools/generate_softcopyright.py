@@ -254,6 +254,31 @@ def add_bullet(doc: Document, text: str) -> None:
     set_cn_font(run, "宋体", 10.5)
 
 
+def add_table(doc: Document, headers: list[str], rows: list[list[str]]) -> None:
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    table.autofit = True
+    hdr = table.rows[0].cells
+    for i, text in enumerate(headers):
+        hdr[i].text = ""
+        p = hdr[i].paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(text)
+        set_cn_font(r, "黑体", 9, True)
+        shading = OxmlElement("w:shd")
+        shading.set(qn("w:fill"), "E8EEF7")
+        hdr[i]._tc.get_or_add_tcPr().append(shading)
+    for row in rows:
+        cells = table.add_row().cells
+        for i, text in enumerate(row):
+            cells[i].text = ""
+            p = cells[i].paragraphs[0]
+            p.paragraph_format.space_after = Pt(2)
+            r = p.add_run(text)
+            set_cn_font(r, "宋体", 8.5)
+    doc.add_paragraph().paragraph_format.space_after = Pt(0)
+
+
 def add_image(doc: Document, filename: str, caption: str, width_cm: float = 11.5) -> None:
     path = IMAGES / filename
     if not path.exists():
@@ -378,18 +403,88 @@ def write_manual(out_docx: Path) -> None:
         add_h1(doc, title)
         for text in paras:
             add_para(doc, text)
-        if title.startswith("3"):
+        if title.startswith("1 "):
+            add_h2(doc, "1.1 编写目的")
+            add_para(doc, "本说明书用于说明墨译漫画小说智能翻译软件的功能范围、运行环境、操作流程、模块设计和异常处理，作为软件著作权登记文档鉴别材料，同时供用户和审查人员了解软件的实际能力。")
+            add_h2(doc, "1.2 读者对象")
+            add_para(doc, "目标读者包括：使用本软件阅读和翻译漫画/小说的普通用户、进行应用商店审核的人员、软件著作权登记审查人员，以及后续维护本项目的开发人员。")
+            add_h2(doc, "1.3 术语")
+            add_para(doc, "OCR：光学字符识别；det：文本检测模型；rec：文本识别模型；覆盖层：按原页面坐标绘制译文文字的透明画布；气泡：漫画中承载对话的闭合区域；术语表：用户导入的专名替换表。")
+        elif title.startswith("2 "):
+            add_para(doc, "软件运行环境汇总如下表。")
+            add_table(doc, ["项目", "要求"], [
+                ["设备类型", "HarmonyOS NEXT 手机、平板、2in1"],
+                ["系统版本", "API 26 及以上"],
+                ["内存", "建议 4GB 以上；本地 OCR/翻译建议 8GB 以上"],
+                ["存储", "安装包约 93MB；本地模型另计"],
+                ["网络", "在线翻译需要网络；本地模式可离线"],
+                ["文件能力", "本地文件选择、图片解码、应用沙箱读写"],
+            ])
+        elif title.startswith("3 "):
+            add_h2(doc, "3.1 安装")
+            add_para(doc, "通过华为应用市场或调试 HAP 安装后，桌面显示“墨译 Moyi”图标。首次启动进入书架页；如系统提示通知/网络权限，可按需授权，拒绝非必要权限不影响本地阅读。")
+            add_h2(doc, "3.2 首次配置")
+            add_para(doc, "使用本地 OCR 前，进入“设置 → OCR → 本地 PP-OCRv6”，点击“下载”，等待检测和识别模型下载完成；使用本地翻译前，在“模型管理”导入 GGUF 模型。")
+            add_h2(doc, "3.3 导入第一本漫画")
+            add_para(doc, "在书架页点击“导入”，选择 ZIP/CBZ、图片目录或相册图片；导入完成后点击漫画卡片进入阅读器。导入失败时检查文件是否完整、格式是否受支持。")
+        elif title.startswith("4 "):
+            add_h2(doc, "4.1 功能清单")
+            add_table(doc, ["功能", "入口", "说明"], [
+                ["漫画导入", "书架 → 导入", "ZIP/CBZ、图片目录、相册"],
+                ["小说导入", "书架 → 小说", "TXT/EPUB 等"],
+                ["整页翻译", "阅读器 → 翻译本页", "OCR + 翻译 + 覆盖"],
+                ["气泡校对", "长按单行气泡", "修改译文并保存"],
+                ["导出", "阅读器 → 导出ZIP/PDF", "原文/译文/双语/PDF"],
+                ["术语表", "设置 → 翻译 → 术语表", "JSON 导入，最长优先替换"],
+                ["本地模型", "设置 → OCR / 模型管理", "PP-OCRv6、GGUF"],
+            ])
+        elif title.startswith("5 "):
+            add_h2(doc, "5.1 翻译流程与预期结果")
+            add_para(doc, "点击“翻译本页”后，页面先显示“解码页面”，随后进入“识别文字”；OCR 完成后按行显示“翻译 x/y 行”，最后显示“保存”。成功后原文位置出现译文覆盖层，失败行保留原文。")
+            add_para(doc, "翻译过程中可继续翻页；批量翻译在后台按页执行，进度面板显示当前页阶段。取消或退出页面时，已完成页的翻译结果仍会保存。")
+        elif title.startswith("6 "):
+            add_h2(doc, "6.1 断点与布局")
+            add_table(doc, ["断点", "宽度", "布局"], [
+                ["sm", "小于 600vp", "手机底部标签栏，单列"],
+                ["md", "600–839vp", "平板/折叠屏，左侧导航轨"],
+                ["lg", "840vp 及以上", "宽屏双列/双页，阅读器可并排"],
+            ])
+            add_para(doc, "阅读器在宽屏下自动计算双页插槽；旋转屏幕或改变窗口大小时，重新计算页面尺寸和覆盖层坐标，保持译文与原文对齐。")
+        elif title.startswith("7 "):
+            add_h2(doc, "7.1 性能与资源")
+            add_table(doc, ["场景", "实测/估算", "说明"], [
+                ["原生 OCR 6 行", "约 594ms", "Mate 90 Pro 模拟器"],
+                ["本地翻译 6 行", "约 1.4s", "随模型/设备变化"],
+                ["整页合计", "约 2.1s", "模拟器合成页"],
+                ["安装包", "约 93MB", "含字体与原生库"],
+            ])
+            add_para(doc, "本地 OCR 的 det 长边限制为 768，减少大图计算量；原生 det/rec 在 TaskPool 中执行，主线程只负责图片解码和界面刷新。")
+        elif title.startswith("8 "):
+            add_h2(doc, "8.1 数据流")
+            add_para(doc, "本地模式：图片/文本只在设备内处理；在线模式：只把待翻译文本发送到用户选择的翻译服务商，不上传整本漫画。API Key 保存在应用沙箱，不写入日志。")
+            add_para(doc, "清理缓存会删除去字底图、临时合成图和导出暂存；卸载应用会删除应用沙箱中的书籍、翻译、术语表与偏好。")
+        elif title.startswith("9 "):
+            add_h2(doc, "9.1 故障处理表")
+            add_table(doc, ["现象", "可能原因", "处理"], [
+                ["图片加载失败", "文件被移动/删除", "重新导入"],
+                ["OCR 无结果", "模型未下载/图片过小", "下载模型、换清晰图片"],
+                ["翻译失败", "网络/Key/模型路径", "检查网络与配置"],
+                ["PDF 导出失败", "PDF Kit 不可用/无写权限", "改用 ZIP 导出"],
+                ["模型导入失败", "文件非 GGUF/不完整", "重新下载/导入"],
+            ])
+        elif title.startswith("10"):
+            add_para(doc, "软件名称、版本号、著作权人应与申请表、源程序页眉、说明书封面保持一致；本软件为首次申请，未登记过低版本。")
+        if title.startswith("3 "):
             add_image(doc, "phone-shelf.jpg", "手机书架与导入入口", 9.5)
-        elif title.startswith("4"):
+        elif title.startswith("4 "):
             add_image(doc, "reader-original.jpg", "漫画阅读原文", 8.8)
             add_image(doc, "ocr-overlay.jpg", "译文覆盖层", 8.8)
-        elif title.startswith("5"):
+        elif title.startswith("5 "):
             add_image(doc, "text-translate.jpg", "文本翻译页面", 8.8)
-        elif title.startswith("6"):
+        elif title.startswith("6 "):
             add_image(doc, "tablet-wide.jpg", "平板宽屏与左侧导航轨", 13.0)
-        elif title.startswith("7"):
+        elif title.startswith("7 "):
             add_image(doc, "model-manager.jpg", "模型管理与存储占用", 8.8)
-        doc.add_page_break()
     # appendix
     add_h1(doc, "附录 A 主要模块")
     for text in [
