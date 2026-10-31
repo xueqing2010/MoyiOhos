@@ -18,7 +18,8 @@ from typing import Iterable
 
 from docx import Document
 from docx.enum.section import WD_SECTION
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING, WD_TAB_ALIGNMENT
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
@@ -83,25 +84,25 @@ def page_setup(doc: Document, margins: float = 1.6) -> None:
 
 
 def add_header_footer(doc: Document, header_text: str) -> None:
+    """页眉第一行软件名/版本，第二行右上角页码；符合登记指南。"""
     section = doc.sections[0]
     header = section.header
     hp = header.paragraphs[0]
     hp.text = ""
-    hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    hp.paragraph_format.space_after = Pt(0)
     run = hp.add_run(header_text)
     set_cn_font(run, "宋体", 8)
+    pp = header.add_paragraph()
+    pp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    pp.paragraph_format.space_after = Pt(0)
+    r1 = pp.add_run("第 ")
+    set_cn_font(r1, "宋体", 8)
+    add_field(pp, "PAGE")
+    r2 = pp.add_run(" 页")
+    set_cn_font(r2, "宋体", 8)
     footer = section.footer
     fp = footer.paragraphs[0]
     fp.text = ""
-    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r1 = fp.add_run("第 ")
-    set_cn_font(r1, "宋体", 8)
-    add_field(fp, "PAGE")
-    r2 = fp.add_run(" 页 / 共 ")
-    set_cn_font(r2, "宋体", 8)
-    add_field(fp, "NUMPAGES")
-    r3 = fp.add_run(" 页")
-    set_cn_font(r3, "宋体", 8)
 
 
 def collect_sources() -> list[Path]:

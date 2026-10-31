@@ -29,6 +29,7 @@ Copyright (C) 2026 薛朝坤
   - 项目地址：https://github.com/notofonts/noto-cjk
   - 许可证：SIL Open Font License 1.1
   - 位置：`entry/src/main/resources/rawfile/fonts/NotoSansSC.otf`
+  - 许可全文：`licenses/OFL-1.1.txt`
   - 用途：覆盖层/导出统一的中日文字体。
 
 ## 模型
@@ -44,6 +45,7 @@ Copyright (C) 2026 薛朝坤
 - 许可证：Apache-2.0
 - 归属：百度飞桨（PaddlePaddle）官方组织
 - 应用内下载镜像：https://hf-mirror.com/PaddlePaddle/...
+- 许可全文：`licenses/apache-2.0.txt`
 - 说明：不再引用上游 StarFlow 仓库的模型文件；模型不随安装包分发。
 
 ## 图标与视觉资源
