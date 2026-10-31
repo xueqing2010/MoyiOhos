@@ -95,6 +95,7 @@ export class PageTranslateService {
       throw new Error('页面记录不存在');
     }
     const lang = await PageTranslateService.loadOcrLang();
+    const targetLang = await PageTranslateService.loadTargetLang();
     const tStart = Date.now();
     let pixelMap: image.PixelMap | undefined = undefined;
     try {
@@ -129,8 +130,8 @@ export class PageTranslateService {
       const tTrans = Date.now();
       const translateLine = async (idx: number): Promise<void> => {
         const region = regions[idx];
-        const req: TranslateRequest = { text: region.text, from: 'auto', to: 'zh' };
-        const key = engineType + '|zh|' + region.text;
+        const req: TranslateRequest = { text: region.text, from: 'auto', to: targetLang };
+        const key = engineType + '|' + targetLang + '|' + region.text;
         const cached = PageTranslateService.lineCache.get(key);
         if (cached !== undefined) {
           translations[idx] = cached;
@@ -152,32 +153,17 @@ export class PageTranslateService {
       };
 
       if (engineType === EngineType.LOCAL_LLAMA && regions.length > 1) {
-        // 本地 llama 串行成本高：把 3–4 行合成一个 prompt，一次生成，按换行拆回。
-        const groups: Array<Array<number>> = [];
-        let current: Array<number> = [];
-        let chars = 0;
-        for (let i = 0; i < regions.length; i++) {
-          const len = regions[i].text.length;
-          if (current.length >= 4 || (chars + len > 600 && current.length > 0)) {
-            groups.push(current);
-            current = [];
-            chars = 0;
-          }
-          current.push(i);
-          chars += len + 1;
-        }
-        if (current.length > 0) {
-          groups.push(current);
-        }
+        // 本地 llama 串行成本高：按空间位置合并成气泡/段落，一次生成后按换行拆回。
+        const groups = PageTranslateService.buildRegionGroups(regions);
         for (const group of groups) {
           let assigned = false;
           if (group.length > 1) {
             const text = group.map((idx: number): string => regions[idx].text).join('\n');
-            const key = 'batch|' + engineType + '|zh|' + text;
+            const key = 'batch|' + engineType + '|' + targetLang + '|' + text;
             try {
               let joined = PageTranslateService.lineCache.get(key);
               if (joined === undefined) {
-                joined = await translator.translate({ text: text, from: 'auto', to: 'zh' });
+                joined = await translator.translate({ text: text, from: 'auto', to: targetLang });
                 if (PageTranslateService.lineCache.size >= PageTranslateService.LINE_CACHE_MAX) {
                   PageTranslateService.lineCache.clear();
                 }
@@ -322,6 +308,16 @@ export class PageTranslateService {
     }
   }
 
+  /** 漫画页目标语言：沿用设置页 target_lang，不再硬编码中文。 */
+  static async loadTargetLang(): Promise<string> {
+    try {
+      const raw = await SettingsRepository.getString(SettingsKeys.TARGET_LANG, 'zh');
+      return raw.length > 0 ? raw : 'zh';
+    } catch (e) {
+      return 'zh';
+    }
+  }
+
   static async loadOcrLang(): Promise<OcrLang> {
     try {
       const ctx = AppEnv.getInstance().getContext();
@@ -380,6 +376,36 @@ export class PageTranslateService {
     } catch (e) {
       // ignore
     }
+  }
+
+  /** 规则气泡/段落合并：垂直间距小且水平重叠的相邻行视为同组。 */
+  private static buildRegionGroups(regions: Array<OcrRegion>): Array<Array<number>> {
+    const groups: Array<Array<number>> = [];
+    let current: Array<number> = [];
+    let chars = 0;
+    for (let i = 0; i < regions.length; i++) {
+      const box = regions[i].box;
+      let same = false;
+      if (current.length > 0) {
+        const prev = regions[current[current.length - 1]].box;
+        const vgap = box.y - (prev.y + prev.h);
+        const overlap = Math.min(prev.x + prev.w, box.x + box.w) - Math.max(prev.x, box.x);
+        const minW = Math.min(prev.w, box.w);
+        same = vgap <= Math.max(8, prev.h * 0.8) && overlap > minW * 0.25
+          && current.length < 4 && chars + regions[i].text.length <= 600;
+      }
+      if (!same && current.length > 0) {
+        groups.push(current);
+        current = [];
+        chars = 0;
+      }
+      current.push(i);
+      chars += regions[i].text.length + 1;
+    }
+    if (current.length > 0) {
+      groups.push(current);
+    }
+    return groups;
   }
 
   private static emitProgress(cb: TranslateProgressCallback | undefined, phase: TranslatePhase,

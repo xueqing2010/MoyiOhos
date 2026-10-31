@@ -13,6 +13,8 @@
 - 修复本地 OCR 图片路径（媒体 URI + fd 回退）、GGUF 导入必须复制进沙箱、模型恢复只认 .gguf、下载完整性校验。
 - 第二批：新增轻量去字底图缓存（框外底色梯度填充），翻译态用透明覆盖替代白块；本地 llama 按 3–4 行批量生成。
 - TaskPool 本地 OCR 经真机验证与 ONNX Runtime 全局环境冲突（Session is closed / already initialized），已回退主线程，后续改用单一专用 Worker。
+- 漫画页目标语言改为读取设置页 `target_lang`，不再硬编码中文。
+- 本地 llama 翻译按空间位置合并气泡/段落（垂直间距 + 水平重叠）；6 行合成页实测 OCR 739ms + 翻译 1291ms。
 - GGUF 翻译模型改用 ModelScope 国内镜像，实测 21.9MB/s。
 - 修复模型管理存储统计为 0B（mkdir EEXIST）并纳入缓存分片。
 
