@@ -120,6 +120,7 @@ devecocli signature generate --force
 ## 文档
 
 - [docs/TESTING.md](docs/TESTING.md)：真机/模拟器测试记录、性能数据与已知限制
+- [docs/BENCHMARK.md](docs/BENCHMARK.md)：OCR/翻译/排版质量与性能基准方法
 - [docs/images](docs/images/)：演示截图索引
 - [skills/harmonyos-arkts-app-dev](skills/harmonyos-arkts-app-dev/)：本项目的全流程开发 skill 与坑位复盘
 - [CHANGELOG.md](CHANGELOG.md)：版本变更记录
