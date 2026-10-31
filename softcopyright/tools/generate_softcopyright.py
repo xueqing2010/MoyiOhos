@@ -223,8 +223,8 @@ def add_para(doc: Document, text: str, size: float = 10.5, bold: bool = False,
              first_indent: bool = True, align=WD_ALIGN_PARAGRAPH.JUSTIFY) -> None:
     p = doc.add_paragraph()
     p.alignment = align
-    p.paragraph_format.line_spacing = 1.5
-    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.line_spacing = 1.3
+    p.paragraph_format.space_after = Pt(3)
     if first_indent:
         p.paragraph_format.first_line_indent = Cm(0.74)
     run = p.add_run(text)
@@ -276,6 +276,14 @@ def add_table(doc: Document, headers: list[str], rows: list[list[str]]) -> None:
             p.paragraph_format.space_after = Pt(2)
             r = p.add_run(text)
             set_cn_font(r, "宋体", 8.5)
+    for row in table.rows:
+        trPr = row._tr.get_or_add_trPr()
+        cant = OxmlElement("w:cantSplit")
+        trPr.append(cant)
+    for cell in table.rows[0].cells:
+        tcPr = cell._tc.get_or_add_tcPr()
+        th = OxmlElement("w:tblHeader")
+        tcPr.append(th)
     doc.add_paragraph().paragraph_format.space_after = Pt(0)
 
 
@@ -330,8 +338,11 @@ def write_manual(out_docx: Path) -> None:
         "8 数据与隐私", "9 常见问题与故障处理", "10 版权与合规说明",
     ]
     for item in toc:
-        add_para(doc, item, 10.5, False)
-    doc.add_page_break()
+        p = doc.add_paragraph()
+        p.paragraph_format.line_spacing = 1.0
+        p.paragraph_format.space_after = Pt(2)
+        r = p.add_run(item)
+        set_cn_font(r, "宋体", 10.5)
     # chapters
     chapters = [
         ("1 软件概述", [
@@ -474,17 +485,13 @@ def write_manual(out_docx: Path) -> None:
             ])
         elif title.startswith("10"):
             add_para(doc, "软件名称、版本号、著作权人应与申请表、源程序页眉、说明书封面保持一致；本软件为首次申请，未登记过低版本。")
-        if title.startswith("3 "):
-            add_image(doc, "phone-shelf.jpg", "手机书架与导入入口", 9.5)
-        elif title.startswith("4 "):
-            add_image(doc, "reader-original.jpg", "漫画阅读原文", 8.8)
-            add_image(doc, "ocr-overlay.jpg", "译文覆盖层", 8.8)
+        if title.startswith("4 "):
+            add_image(doc, "reader-original.jpg", "漫画阅读原文", 10.5)
+            add_image(doc, "ocr-overlay.jpg", "译文覆盖层", 10.5)
         elif title.startswith("5 "):
-            add_image(doc, "text-translate.jpg", "文本翻译页面", 8.8)
+            add_image(doc, "text-translate.jpg", "文本翻译页面", 10.5)
         elif title.startswith("6 "):
-            add_image(doc, "tablet-wide.jpg", "平板宽屏与左侧导航轨", 13.0)
-        elif title.startswith("7 "):
-            add_image(doc, "model-manager.jpg", "模型管理与存储占用", 8.8)
+            add_image(doc, "tablet-wide.jpg", "平板宽屏与左侧导航轨", 10.5)
     # appendix
     add_h1(doc, "附录 A 主要模块")
     for text in [
