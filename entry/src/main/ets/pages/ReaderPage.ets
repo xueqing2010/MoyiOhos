@@ -37,7 +37,7 @@ import { OcrModelService } from '../service/OcrModelService';
 import { PageImageCleaner } from '../service/PageImageCleaner';
 import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
 import { BatchState } from '../service/BatchTranslateService';
-import { ExportMode, ExportResult } from '../service/ExportService';
+import { ExportMode, ExportResult, ExportService } from '../service/ExportService';
 import { MangaTocJump, makeMangaTocParams } from './MangaTocPage';
 import { ShelfViewModel } from '../viewmodel/ShelfViewModel';
 
@@ -1223,6 +1223,31 @@ export struct ReaderPage {
     });
   }
 
+  private runExportPdf(): void {
+    this.showExportModes = false;
+    this.menuVisible = false;
+    this.settingsVisible = false;
+    this.exportBusy = true;
+    this.exportDone = 0;
+    this.exportTotal = this.pages.length;
+    ExportService.exportPdf(this.mangaId, (done: number, total: number) => {
+      this.exportDone = done;
+      this.exportTotal = total;
+    }, () => {
+      return false;
+    }).then((result: ExportResult) => {
+      this.exportBusy = false;
+      if (result.cancelled) {
+        this.showToast('PDF 导出已取消');
+        return;
+      }
+      this.showToast('PDF 已导出：' + result.appDirPath);
+    }).catch((e: Object) => {
+      this.exportBusy = false;
+      this.showToast('PDF 导出失败：' + e);
+    });
+  }
+
   private runExport(mode: ExportMode): void {
     this.showExportModes = false;
     // 关闭阅读菜单/设置浮层：避免系统保存选择器返回时与页面内浮层状态互相干扰。
@@ -1801,6 +1826,23 @@ export struct ReaderPage {
         this.exportModeButton('仅原文', '原始页图直接归集', ExportMode.ORIGINAL_ONLY)
         this.exportModeButton('仅译文', '原图 + 译文覆盖合成', ExportMode.TRANSLATED_ONLY)
         this.exportModeButton('双语对照', '原文页与译文页按页序交替', ExportMode.BILINGUAL)
+        Column({ space: 2 }) {
+          Text('导出 PDF')
+            .fontSize(ThemeTokens.FONT_BODY)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(ThemeTokens.TEXT_PRIMARY)
+          Text('译文合成 PDF，保存到应用文件目录')
+            .fontSize(ThemeTokens.FONT_SMALL)
+            .fontColor(ThemeTokens.TEXT_HINT)
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding(12)
+        .borderRadius(ThemeTokens.RADIUS_SMALL)
+        .backgroundColor(ThemeTokens.SURFACE_VARIANT)
+        .onClick(() => {
+          this.runExportPdf();
+        })
         Button('取消')
           .fontSize(ThemeTokens.FONT_SMALL)
           .fontColor(ThemeTokens.TEXT_SECONDARY)

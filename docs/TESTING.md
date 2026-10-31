@@ -40,6 +40,7 @@
 - 每框采样底色亮度，黑/白字逐块切换并加 1px 描边；
 - 整页大框 / 单字大框（面积 >4%）过滤生效；
 - P1-8 长按气泡弹出校对框，保存后 translations_json 更新成功；
+- P1-9 PDF 导出：1 页合成 PDF 约 26.6KB，保存到 files/exports。
 - 真机 PCE-W30 未连接，未做全分辨率真机复测；
 - TaskPool 本地 OCR 复现 `Session is closed` / `already initialized`，已回退主线程；
 - 真机 PCE-W30 未连接，未做真机复测。

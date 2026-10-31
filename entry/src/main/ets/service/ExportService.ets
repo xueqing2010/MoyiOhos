@@ -5,6 +5,7 @@ import { zlib } from '@kit.BasicServicesKit';
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import { LengthMetricsUnit } from '@kit.ArkUI';
+import { pdfService } from '@kit.PDFKit';
 import { Manga, MangaPage, PageTranslation } from 'coremodel';
 import {
   DisplayRect,
@@ -246,6 +247,123 @@ export class ExportService {
         // ignore
       }
       Log.info(TAG, `[export] cleanup done in ${Date.now() - cleanAt}ms`);
+    }
+  }
+
+  /**
+   * 导出译文 PDF：先把每页合成为 JPEG，再用 PDF Kit 按图片比例生成页面。
+   * 不依赖 ZIP/选择器，先写入应用沙箱 files/exports。
+   */
+  static async exportPdf(mangaId: number,
+    onProgress: (done: number, total: number) => void,
+    isCancelled?: () => boolean): Promise<ExportResult> {
+    const result = new ExportResult();
+    await AppEnv.ready();
+    const manga: Manga | undefined = await MangaRepository.getById(mangaId);
+    if (manga === undefined) {
+      throw new Error('漫画记录不存在');
+    }
+    const pages: Array<MangaPage> = await PageRepository.getPages(mangaId);
+    if (pages.length === 0) {
+      throw new Error('没有可导出的页面');
+    }
+    const opts = await ExportService.loadRenderOptions();
+    const whiteMerge = await ExportService.loadWhiteMerge();
+    const cacheDir = AppEnv.getInstance().getContext().cacheDir;
+    const staging = cacheDir + '/pdf/' + Date.now();
+    fs.mkdirSync(staging, true);
+    const total = pages.length;
+    try {
+      const images: Array<string> = [];
+      for (let i = 0; i < total; i++) {
+        if (isCancelled !== undefined && isCancelled()) {
+          result.cancelled = true;
+          return result;
+        }
+        const page = pages[i];
+        const dest = staging + '/page-' + ExportService.pad4(i + 1) + '.jpg';
+        const pt = await PageRepository.getTranslation(page.id);
+        if (pt !== undefined && pt.translations.length > 0) {
+          await ExportService.composeTranslated(page, pt, dest, opts, whiteMerge);
+        } else {
+          ExportService.copyOriginal(page, dest);
+          result.untranslated++;
+        }
+        if (ExportService.sizeOf(dest) <= 0) {
+          throw new Error('PDF 页面合成为空：page ' + page.id);
+        }
+        images.push(dest);
+        onProgress(i + 1, total);
+      }
+
+      const doc = new pdfService.PdfDocument();
+      try {
+        const firstInfo = await ExportService.imageSize(images[0]);
+        let pageW = Math.max(1, firstInfo.size.width * 0.75);
+        let pageH = Math.max(1, firstInfo.size.height * 0.75);
+        if (!doc.createDocument(pageW, pageH)) {
+          throw new Error('PDF 创建失败');
+        }
+        for (let i = 0; i < images.length; i++) {
+          const info = await ExportService.imageSize(images[i]);
+          const w = Math.max(1, info.size.width * 0.75);
+          const h = Math.max(1, info.size.height * 0.75);
+          let page = i === 0 ? doc.getPage(0) : doc.insertBlankPage(i, w, h);
+          if (page === undefined || page === null) {
+            throw new Error('PDF 页面创建失败');
+          }
+          page.addImageObject(images[i], 0, 0, w, h);
+        }
+        const outDir = AppEnv.getInstance().getContext().filesDir + '/exports';
+        try {
+          if (!fs.accessSync(outDir)) {
+            fs.mkdirSync(outDir, true);
+          }
+        } catch (e) {
+        }
+        const safeName = manga.name.replace(/[\\/:*?"<>|]/g, '_');
+        const outPath = outDir + '/' + safeName + '-' + Date.now() + '.pdf';
+        if (!doc.saveDocument(outPath)) {
+          throw new Error('PDF 保存失败');
+        }
+        result.uri = fileUri.getUriFromPath(outPath);
+        result.appDirPath = outPath;
+        result.exported = total;
+        result.savedToAppDir = true;
+        Log.info(TAG, 'PDF exported: ' + outPath);
+        return result;
+      } finally {
+        try {
+          doc.releaseDocument();
+        } catch (e) {
+        }
+      }
+    } finally {
+      ExportService.rmRecursive(staging);
+    }
+  }
+
+  private static async imageSize(path: string): Promise<image.ImageInfo> {
+    let src: image.ImageSource | undefined = undefined;
+    let file: fs.File | undefined = undefined;
+    try {
+      try {
+        src = image.createImageSource(toMediaUri(path));
+      } catch (e) {
+        src = undefined;
+      }
+      if (src === undefined || src === null) {
+        file = fs.openSync(path, fs.OpenMode.READ_ONLY);
+        src = image.createImageSource(file.fd);
+      }
+      return await src.getImageInfo();
+    } finally {
+      if (src !== undefined) {
+        src.release();
+      }
+      if (file !== undefined) {
+        fs.closeSync(file);
+      }
     }
   }
 
