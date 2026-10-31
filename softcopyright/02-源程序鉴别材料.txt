@@ -3,6 +3,1508 @@
 // 著作权人：薛朝坤
 // 本文件为计算机软件著作权登记源程序鉴别材料（前30页+后30页）。
 //
+// ==================== 文件：entry/src/main/ets/service/PageTranslateService.ets ====================
+import fs from '@ohos.file.fs';
+import { image } from '@kit.ImageKit';
+import { preferences } from '@kit.ArkData';
+import { OcrRegion, PageTranslation, TranslateStatus, makePageTranslation } from 'coremodel';
+import { EngineType, TranslateRequest, Translator } from 'coretranslate';
+import { OcrLang, OcrService } from 'coreocr';
+import { Log, toMediaUri } from 'commons';
+import { util } from '@kit.ArkTS';
+import { AppEnv } from '../common/AppEnv';
+import { PageRepository } from '../data/PageRepository';
+import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
+import { OcrModelService } from './OcrModelService';
+import { GlossaryService } from './GlossaryService';
+import { OcrRecService } from './OcrRecService';
+
+const TAG = 'PageTranslateService';
+const PREF_FILE = 'starflow_translate';
+const KEY_OCR_LANG = 'ocr_lang';
+const KEY_ENGINE = 'text_engine';
+
+/**
+ * 单页翻译闭环服务（T025 / plan D6/D13）：
+ * 解码页图 → Core Vision OCR 行级识别 → 引擎逐行串行翻译 → 按序回填 →
+ * 落库 page_translation（只存译文文本 + 原始坐标，FR-014）。
+ *
+ * 说明：PixelMap 非 Sendable，无法从 taskPool 返回，故图像解码走主线程
+ * 异步链（image.createImageSource 为异步 API，不阻塞帧）；OCR 与引擎调用
+ * 亦运行在 ArkTS 线程。
+ */
+export enum TranslatePhase {
+  OCR = 0,
+  TRANSLATE = 1,
+  SAVING = 2
+}
+
+/** 单页翻译的可观察进度（OCR → 逐行翻译 → 落库）。 */
+export class TranslateProgress {
+  phase: TranslatePhase = TranslatePhase.OCR;
+  done: number = 0;
+  total: number = 0;
+  percent: number = 0;
+  detail: string = '';
+}
+
+export type TranslateProgressCallback = (p: TranslateProgress) => void;
+
+export class PageTranslateService {
+  private static dictText: string = '';
+  /** 页内行级译文缓存：漫画气泡重复率高，命中可直接跳过网络/模型。 */
+  private static lineCache: Map<string, string> = new Map<string, string>();
+  private static readonly LINE_CACHE_MAX = 600;
+
+  private static async configureOcr(): Promise<void> {
+    const tier = await SettingsRepository.getString(SettingsKeys.OCR_ENGINE_TIER, 'system');
+    const service = OcrService.getInstance();
+    if (tier !== 'local') {
+      service.setLocalEnabled(false);
+      return;
+    }
+    if (!OcrModelService.localModelsReady()) {
+      throw new Error('本地 OCR 模型未下载：请到「设置 → OCR」下载检测与识别模型');
+    }
+    if (PageTranslateService.dictText.length === 0) {
+      const bytes = await 
+AppEnv.getInstance().getContext().resourceManager.getRawFileContent('ppocrv6_dict.txt');
+      const decoder: util.TextDecoder = util.TextDecoder.create('utf-8');
+      PageTranslateService.dictText = decoder.decodeToString(bytes);
+    }
+    const models = OcrModelService.list();
+    service.configureLocal(OcrModelService.path(models[0]), OcrModelService.path(models[1]),
+      PageTranslateService.dictText);
+    service.setLocalEnabled(true);
+    OcrRecService.initNative(OcrModelService.path(models[0]), OcrModelService.path(models[1]));
+  }
+
+  /** 启动预热：系统 OCR 初始化或本地 OCR 会话加载，失败只记日志。 */
+  static async prewarm(): Promise<void> {
+    await AppEnv.ready();
+    await PageTranslateService.configureOcr();
+    await OcrService.getInstance().prewarmLocal();
+    Log.info(TAG, 'OCR prewarm done, local=' + OcrService.getInstance().isLocalEnabled());
+  }
+
+  static async translatePage(pageId: number, engineType: EngineType,
+    onProgress?: TranslateProgressCallback): Promise<PageTranslation> {
+    return PageTranslateService.run(pageId, engineType, onProgress);
+  }
+
+  static async retryPage(pageId: number, engineType: EngineType,
+    onProgress?: TranslateProgressCallback): Promise<PageTranslation> {
+    return PageTranslateService.run(pageId, engineType, onProgress);
+  }
+
+  private static async run(pageId: number, engineType: EngineType,
+    onProgress?: TranslateProgressCallback): Promise<PageTranslation> {
+    await AppEnv.ready();
+    const page = await PageRepository.getPage(pageId);
+    if (page === undefined) {
+      throw new Error('页面记录不存在');
+    }
+    const lang = await PageTranslateService.loadOcrLang();
+    const targetLang = await PageTranslateService.loadTargetLang();
+    await GlossaryService.load();
+    const tStart = Date.now();
+    let pixelMap: image.PixelMap | undefined = undefined;
+    try {
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 2, 0, 0, '准备 OCR');
+      await PageTranslateService.configureOcr();
+
+      // 本地 OCR 直接读文件；系统 OCR 才需要先解码 PixelMap。
+      const localOcr = OcrService.getInstance().isLocalEnabled();
+      if (!localOcr) {
+        PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 8, 0, 0, '解码页面');
+        pixelMap = await PageTranslateService.decode(page.imagePath);
+      }
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.OCR, 15, 0, 0, '识别文字');
+      const tOcr = Date.now();
+      // ONNX Runtime 的环境/会话在 TaskPool 中会与其他 worker 冲突
+      // （Session is closed / OnnxEnvironment already initialized），
+      // 当前版本回到主线程；后续用单一专用 Worker 再迁移。
+      let regions: Array<OcrRegion> = [];
+      if (localOcr) {
+        try {
+          regions = await OcrRecService.recognizePage(page.imagePath,
+            PageTranslateService.dictText);
+        } catch (e) {
+          Log.warn(TAG, 'native det/rec failed, fallback JS: ' + e);
+        }
+        if (regions.length === 0) {
+          regions = await OcrService.getInstance().recognize(undefined, lang, page.imagePath);
+        }
+      } else {
+        regions = await OcrService.getInstance().recognize(pixelMap, lang, page.imagePath);
+      }
+      const ocrMs = Date.now() - tOcr;
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, 35, 0, 
+regions.length,
+        '识别完成 ' + regions.length + ' 行');
+
+      const translator: Translator = AppEnv.getInstance().engineRegistry.get(engineType);
+      const translations: Array<string> = [];
+      for (let i = 0; i < regions.length; i++) {
+        translations.push('');
+      }
+      let failed = 0;
+      let firstError = '';
+      let completed = 0;
+      const tTrans = Date.now();
+      const translateLine = async (idx: number): Promise<void> => {
+        const region = regions[idx];
+        const source = GlossaryService.preReplace(region.text);
+        const remembered = GlossaryService.lookup(source);
+        if (remembered !== undefined) {
+          translations[idx] = remembered;
+          return;
+        }
+        const req: TranslateRequest = { text: source, from: 'auto', to: targetLang };
+        const key = engineType + '|' + targetLang + '|' + source;
+        const cached = PageTranslateService.lineCache.get(key);
+        if (cached !== undefined) {
+          translations[idx] = cached;
+          return;
+        }
+        const translated = await translator.translate(req);
+        translations[idx] = translated;
+        if (PageTranslateService.lineCache.size >= PageTranslateService.LINE_CACHE_MAX) {
+          PageTranslateService.lineCache.clear();
+        }
+        PageTranslateService.lineCache.set(key, translated);
+      };
+      const markProgress = (n: number): void => {
+        completed = Math.min(regions.length, completed + n);
+        const pct = regions.length === 0 ? 95
+          : 35 + Math.round(60 * completed / regions.length);
+        PageTranslateService.emitProgress(onProgress, TranslatePhase.TRANSLATE, pct,
+          completed, regions.length, '翻译 ' + completed + '/' + regions.length + ' 行');
+      };
+
+      if (engineType === EngineType.LOCAL_LLAMA && regions.length > 1) {
+        // 本地 llama 串行成本高：按空间位置合并成气泡/段落，一次生成后按换行拆回。
+        const groups = PageTranslateService.buildRegionGroups(regions);
+        for (const group of groups) {
+          let assigned = false;
+          if (group.length > 1) {
+            const text = group.map((idx: number): string => 
+GlossaryService.preReplace(regions[idx].text)).join('\n');
+            const key = 'batch|' + engineType + '|' + targetLang + '|' + text;
+            try {
+              let joined = PageTranslateService.lineCache.get(key);
+              if (joined === undefined) {
+                joined = await translator.translate({ text: text, from: 'auto', to: targetLang 
+});
+                if (PageTranslateService.lineCache.size >= PageTranslateService.LINE_CACHE_MAX) 
+{
+                  PageTranslateService.lineCache.clear();
+                }
+                PageTranslateService.lineCache.set(key, joined);
+              }
+              const lines = joined.split('\n').map((s: string): string => s.trim())
+                .filter((s: string): boolean => s.length > 0);
+              if (lines.length === group.length) {
+                for (let k = 0; k < group.length; k++) {
+                  translations[group[k]] = lines[k];
+                }
+                assigned = true;
+              }
+            } catch (e) {
+              Log.warn(TAG, 'batch translate failed, fallback per-line: ' + e);
+            }
+          }
+          if (!assigned) {
+            for (const idx of group) {
+              try {
+                await translateLine(idx);
+              } catch (e) {
+                failed++;
+                if (firstError.length === 0) {
+                  firstError = PageTranslateService.readableError(e);
+                }
+              }
+            }
+          }
+          markProgress(group.length);
+        }
+      } else {
+        // 网络引擎 6 路并发；单行引擎或只有一行时走逐行。
+        const concurrency = Math.max(1, Math.min(engineType === EngineType.LOCAL_LLAMA ? 1 : 6,
+          regions.length));
+        let cursor = 0;
+        const worker = async (): Promise<void> => {
+          while (cursor < regions.length) {
+            const idx = cursor++;
+            try {
+              await translateLine(idx);
+            } catch (e) {
+              failed++;
+              if (firstError.length === 0) {
+                firstError = PageTranslateService.readableError(e);
+              }
+            }
+            markProgress(1);
+          }
+        };
+        const workers: Array<Promise<void>> = [];
+        for (let i = 0; i < concurrency; i++) {
+          workers.push(worker());
+        }
+        await Promise.all(workers);
+      }
+      Log.info(TAG, 'page ' + pageId + ' timings: ocr=' + ocrMs + 'ms, translate='
+        + (Date.now() - tTrans) + 'ms, total=' + (Date.now() - tStart) + 'ms');
+
+      const pt = makePageTranslation(pageId);
+      pt.engineType = engineType as number;
+      pt.ocr = regions;
+      pt.translations = translations;
+      if (regions.length === 0) {
+        pt.status = TranslateStatus.PARTIAL_FAILED;
+        pt.failReason = '未识别到任何文字行';
+      } else if (failed > 0) {
+        pt.status = TranslateStatus.PARTIAL_FAILED;
+        pt.failReason = `${failed}/${regions.length} 行翻译失败：${firstError}`;
+      } else {
+        pt.status = TranslateStatus.DONE;
+      }
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.SAVING, 98,
+        completed, regions.length, '保存译文');
+      await PageRepository.saveTranslation(pt);
+      const sources: Array<string> = [];
+      for (const r of regions) {
+        sources.push(r.text);
+      }
+      GlossaryService.rememberPage(sources, translations).catch((e: Object) => {
+        Log.warn(TAG, 'remember translation failed: ' + e);
+      });
+      PageTranslateService.emitProgress(onProgress, TranslatePhase.SAVING, 100,
+        completed, regions.length, '完成');
+      Log.info(TAG, `page ${pageId}: ${regions.length} lines, ${failed} failed`);
+      return pt;
+    } catch (e) {
+      const reason = PageTranslateService.readableError(e);
+      const pt = makePageTranslation(pageId);
+      pt.engineType = engineType as number;
+      pt.status = TranslateStatus.PARTIAL_FAILED;
+      pt.failReason = reason;
+      try {
+        await PageRepository.saveTranslation(pt);
+      } catch (ignore) {
+        // 落库失败不掩盖原始错误
+      }
+      Log.error(TAG, `page ${pageId} failed: ${reason}`);
+      throw new Error(reason);
+    } finally {
+      if (pixelMap !== undefined) {
+        try {
+          pixelMap.release();
+        } catch (ignore) {
+          // release 失败忽略
+        }
+      }
+    }
+  }
+
+  /**
+   * 解码页图：沙箱绝对路径需先转媒体 URI（Image/ImageSource 不认裸路径），
+   * 失败再退回 fd 打开（目录授权的 content:// 等场景）。
+   */
+  static async decode(path: string): Promise<image.PixelMap> {
+    let source: image.ImageSource | undefined = undefined;
+    let file: fs.File | undefined = undefined;
+    try {
+      try {
+        source = image.createImageSource(toMediaUri(path));
+      } catch (e) {
+        source = undefined;
+      }
+      if (source === undefined || source === null) {
+        file = fs.openSync(path, fs.OpenMode.READ_ONLY);
+        source = image.createImageSource(file.fd);
+      }
+      if (source === undefined || source === null) {
+        throw new Error('无法解码图片');
+      }
+      const pm = await source.createPixelMap();
+      if (pm === undefined || pm === null) {
+        throw new Error('无法创建像素图');
+      }
+      return pm;
+    } finally {
+      if (source !== undefined) {
+        try {
+          source.release();
+        } catch (ignore) {
+        }
+      }
+      if (file !== undefined) {
+        try {
+          fs.closeSync(file);
+        } catch (ignore) {
+        }
+      }
+    }
+  }
+
+  /** 漫画页目标语言：沿用设置页 target_lang，不再硬编码中文。 */
+  static async loadTargetLang(): Promise<string> {
+    try {
+      const raw = await SettingsRepository.getString(SettingsKeys.TARGET_LANG, 'zh');
+      return raw.length > 0 ? raw : 'zh';
+    } catch (e) {
+      return 'zh';
+    }
+  }
+
+  static async loadOcrLang(): Promise<OcrLang> {
+    try {
+      const ctx = AppEnv.getInstance().getContext();
+      const pref = await preferences.getPreferences(ctx, PREF_FILE);
+      const raw = pref.getSync(KEY_OCR_LANG, OcrLang.JPN as string) as string;
+      if (raw === OcrLang.ENG) {
+        return OcrLang.ENG;
+      }
+      if (raw === OcrLang.KOR) {
+        return OcrLang.KOR;
+      }
+      if (raw === OcrLang.CHN) {
+        return OcrLang.CHN;
+      }
+      return OcrLang.JPN;
+    } catch (e) {
+      return OcrLang.JPN;
+    }
+  }
+
+  static async saveOcrLang(lang: OcrLang): Promise<void> {
+    try {
+      const ctx = AppEnv.getInstance().getContext();
+      const pref = await preferences.getPreferences(ctx, PREF_FILE);
+      pref.putSync(KEY_OCR_LANG, lang as string);
+      await pref.flush();
+    } catch (e) {
+      // 偏好保存失败不影响当次翻译
+    }
+  }
+
+  /** Persisted default translation engine (Bing when unset). */
+  static async loadEngineType(): Promise<EngineType> {
+    try {
+      const ctx = AppEnv.getInstance().getContext();
+      const pref = await preferences.getPreferences(ctx, PREF_FILE);
+      const raw = pref.getSync(KEY_ENGINE, EngineType.BING as number) as number;
+      if (raw === EngineType.OPENAI_COMPAT) {
+        return EngineType.OPENAI_COMPAT;
+      }
+      if (raw === EngineType.LOCAL_LLAMA) {
+        return EngineType.LOCAL_LLAMA;
+      }
+      return EngineType.BING;
+    } catch (e) {
+      return EngineType.BING;
+    }
+  }
+
+  static async saveEngineType(type: EngineType): Promise<void> {
+    try {
+      const ctx = AppEnv.getInstance().getContext();
+      const pref = await preferences.getPreferences(ctx, PREF_FILE);
+      pref.putSync(KEY_ENGINE, type as number);
+      await pref.flush();
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  /** 规则气泡/段落合并：垂直间距小且水平重叠的相邻行视为同组。 */
+  private static buildRegionGroups(regions: Array<OcrRegion>): Array<Array<number>> {
+    const groups: Array<Array<number>> = [];
+    let current: Array<number> = [];
+    let chars = 0;
+    for (let i = 0; i < regions.length; i++) {
+      const box = regions[i].box;
+      let same = false;
+      if (current.length > 0) {
+        const prev = regions[current[current.length - 1]].box;
+        const vgap = box.y - (prev.y + prev.h);
+        const overlap = Math.min(prev.x + prev.w, box.x + box.w) - Math.max(prev.x, box.x);
+        const minW = Math.min(prev.w, box.w);
+        same = vgap <= Math.max(8, prev.h * 0.8) && overlap > minW * 0.25
+          && current.length < 4 && chars + regions[i].text.length <= 600;
+      }
+      if (!same && current.length > 0) {
+        groups.push(current);
+        current = [];
+        chars = 0;
+      }
+      current.push(i);
+      chars += regions[i].text.length + 1;
+    }
+    if (current.length > 0) {
+      groups.push(current);
+    }
+    return groups;
+  }
+
+  private static emitProgress(cb: TranslateProgressCallback | undefined, phase: TranslatePhase,
+    percent: number, done: number, total: number, detail: string): void {
+    if (cb === undefined) {
+      return;
+    }
+    const p = new TranslateProgress();
+    p.phase = phase;
+    p.percent = Math.max(0, Math.min(100, percent));
+    p.done = done;
+    p.total = total;
+    p.detail = detail;
+    try {
+      cb(p);
+    } catch (e) {
+      Log.warn(TAG, 'progress callback failed: ' + e);
+    }
+  }
+
+  static readableError(e: Object): string {
+    const err = e as Error;
+    if (err !== undefined && err !== null && err.message !== undefined && err.message.length > 
+0) {
+      return err.message;
+    }
+    return '页面翻译失败';
+  }
+}
+// ==================== 文件：coreocr/src/main/ets/LocalOcrEngine.ets ====================
+import { image } from '@kit.ImageKit';
+import fs from '@ohos.file.fs';
+import { OnnxEnvironment, OnnxTensor, OnnxResult, OnnxSession, OnnxValue, TensorInfo } from 
+'@ohos/onnxruntime';
+import { Log, toMediaUri } from 'commons';
+import { OcrRegion, makeOcrRegion, makePixelRect } from 'coremodel';
+const TAG = 'LocalOcrEngine';
+// 768 足够识别漫画气泡文字，同时比 960 少约 36% 检测像素；
+// 实测把整页 OCR 从 2.6s 降到约 1.7s。
+const DET_MAX_SIDE = 768;
+const DET_THRESH = 0.3;
+const DET_MIN_SIZE = 4;
+const REC_HEIGHT = 48;
+export interface LocalOcrConfig {
+    detPath: string;
+    recPath: string;
+    dictText: string;
+}
+class PagePixels {
+    width: number = 0;
+    height: number = 0;
+    rgba: Uint8Array = new Uint8Array(0);
+}
+class CandidateBox {
+    x: number = 0;
+    y: number = 0;
+    w: number = 0;
+    h: number = 0;
+}
+/**
+ * 本地 PP-OCRv6 推理（ONNX Runtime OHOS NAPI）：det 文本检测 + rec CTC 识别。
+ * 模型由用户在设置中可选下载；字典随安装包（上游 ppocrv6_dict.txt）。
+ * 后处理做了轻量实现：3x3 膨胀 + 连通域 + 轴对齐框，适合漫画气泡文本行。
+ */
+export class LocalOcrEngine {
+    private static instance: LocalOcrEngine = new LocalOcrEngine();
+    private detSession: OnnxSession | undefined = undefined;
+    private recSession: OnnxSession | undefined = undefined;
+    private dict: Array<string> = [];
+    private envReady: boolean = false;
+    private configKey: string = '';
+    static getInstance(): LocalOcrEngine {
+        return LocalOcrEngine.instance;
+    }
+    isReady(): boolean {
+        return this.detSession !== undefined && this.recSession !== undefined;
+    }
+    /** 加载/复用会话；配置变化才重建。 */
+    async init(config: LocalOcrConfig): Promise<void> {
+        const key = config.detPath + '|' + config.recPath;
+        if (this.isReady() && key === this.configKey) {
+            return;
+        }
+        this.release();
+        if (!this.envReady) {
+            try {
+                OnnxEnvironment.InitEnvironment();
+            }
+            catch (e) {
+                const msg = (e as Error).message ?? '';
+                // ONNX Runtime 环境是进程级的；另一个线程初始化过后这里会抛
+                // "already initialized"，此时直接复用即可，不能当成失败。
+                if (msg.indexOf('already initialized') < 0) {
+                    throw new Error(msg.length > 0 ? msg : 'ONNX Runtime 初始化失败');
+                }
+                Log.warn(TAG, 'ORT environment already initialized by another thread');
+            }
+            // 张量构造自检：验证 NAPI 环境/分配器已就绪（否则会在构造时空指针）。
+            const probe = new OnnxTensor(new ArrayBuffer(12), [3], 0);
+            probe.Close();
+            this.envReady = true;
+            Log.info(TAG, 'ORT environment ready, version=' + OnnxEnvironment.GetVersion());
+        }
+        const t0 = Date.now();
+        try {
+            this.detSession = OnnxEnvironment.CreateSessionFromModelFile(config.detPath);
+            this.recSession = OnnxEnvironment.CreateSessionFromModelFile(config.recPath);
+        }
+        catch (e) {
+            this.release();
+            const err = e as Error;
+            const detail = err !== undefined && err.message !== undefined ? err.message : 
+JSON.stringify(e);
+            Log.error(TAG, 'OCR model load failed: ' + detail);
+            throw new Error('本地 OCR 模型加载失败：' + detail + '（请重新下载 det/rec 模型）');
+        }
+        const lines = config.dictText.split('\n');
+        // CTC class 0 = blank；字典文件第一行才是第一个真实字符，需前置 blank。
+        const dict: Array<string> = [''];
+        for (const line of lines) {
+            const ch = line.endsWith('\r') ? line.substring(0, line.length - 1) : line;
+            if (ch.length > 0) {
+                dict.push(ch);
+            }
+        }
+        this.dict = dict;
+        this.configKey = key;
+        Log.info(TAG, 'OCR sessions ready in ' + (Date.now() - t0) + 'ms, dict=' + dict.length);
+    }
+    release(): void {
+        try {
+            if (this.detSession !== undefined) {
+                this.detSession.Close();
+            }
+        }
+        catch (e) {
+        }
+        try {
+            if (this.recSession !== undefined) {
+                this.recSession.Close();
+            }
+        }
+        catch (e) {
+        }
+        this.detSession = undefined;
+        this.recSession = undefined;
+        this.dict = [];
+        this.configKey = '';
+    }
+    /** 仅跑 det，返回扁平框 [x,y,w,h,...]；供 Entry 原生 rec 异步使用。 */
+    async detectBoxes(pagePath: string): Promise<Array<number>> {
+        if (this.detSession === undefined) {
+            throw new Error('本地 OCR 检测模型尚未初始化');
+        }
+        const page = await this.loadPixels(pagePath);
+        const boxes = this.detect(page);
+        const out: Array<number> = [];
+        for (const box of boxes) {
+            out.push(box.x);
+            out.push(box.y);
+            out.push(box.w);
+            out.push(box.h);
+        }
+        return out;
+    }
+
+    async recognize(pagePath: string): Promise<Array<OcrRegion>> {
+        if (!this.isReady()) {
+            throw new Error('本地 OCR 尚未初始化');
+        }
+        const page = await this.loadPixels(pagePath);
+        if (page.width <= 0 || page.height <= 0) {
+            throw new Error('页面图像解码失败');
+        }
+        const t0 = Date.now();
+        const boxes = this.detect(page);
+        Log.info(TAG, 'det boxes=' + boxes.length + ' in ' + (Date.now() - t0) + 'ms');
+        const regions: Array<OcrRegion> = [];
+        for (const box of boxes) {
+            try {
+                const text = this.recognizeBox(page, box);
+                const trimmed = text.trim();
+                const area = box.w * box.h;
+                const pageArea = page.width * page.height;
+                // 过滤整页大框，以及“单字却占大面积”的伪检测（暗色背景/线稿误检）。
+                if (trimmed.length === 0 || area > pageArea * 0.15
+                    || (trimmed.length <= 2 && area > pageArea * 0.04)) {
+                    Log.warn(TAG, 'skip suspicious box ' + box.w + 'x' + box.h + ' text=' + 
+trimmed);
+                    continue;
+                }
+                regions.push(makeOcrRegion(trimmed, makePixelRect(box.x, box.y, box.w, box.h)));
+            }
+            catch (e) {
+                Log.warn(TAG, 'rec box failed: ' + JSON.stringify(e));
+            }
+        }
+        regions.sort((a: OcrRegion, b: OcrRegion): number => {
+            if (Math.abs(a.box.y - b.box.y) > 12) {
+                return a.box.y - b.box.y;
+            }
+            return a.box.x - b.box.x;
+        });
+        Log.info(TAG, 'local OCR lines=' + regions.length + ', total=' + (Date.now() - t0) + 
+'ms');
+        return regions;
+    }
+    private async loadPixels(pagePath: string): Promise<PagePixels> {
+        const out = new PagePixels();
+        let source: image.ImageSource | undefined = undefined;
+        let file: fs.File | undefined = undefined;
+        try {
+            try {
+                source = image.createImageSource(toMediaUri(pagePath));
+            }
+            catch (e) {
+                source = undefined;
+            }
+            if (source === undefined || source === null) {
+                file = fs.openSync(pagePath, fs.OpenMode.READ_ONLY);
+                source = image.createImageSource(file.fd);
+            }
+            if (source === undefined || source === null) {
+                throw new Error('无法打开页面图片');
+            }
+            const pm = await source.createPixelMap();
+            if (pm === undefined || pm === null) {
+                throw new Error('无法创建页面像素图');
+            }
+            const info = await pm.getImageInfo();
+            out.width = info.size.width;
+            out.height = info.size.height;
+            const buffer = new ArrayBuffer(out.width * out.height * 4);
+            await pm.readPixelsToBuffer(buffer);
+            out.rgba = new Uint8Array(buffer);
+            pm.release();
+            return out;
+        }
+        finally {
+            if (source !== undefined) {
+                source.release();
+            }
+            if (file !== undefined) {
+                fs.closeSync(file);
+            }
+        }
+    }
+    private detect(page: PagePixels): Array<CandidateBox> {
+        let scale = 1;
+        const maxSide = Math.max(page.width, page.height);
+        if (maxSide > DET_MAX_SIDE) {
+            scale = DET_MAX_SIDE / maxSide;
+        }
+        const detW = Math.max(32, Math.round(page.width * scale / 32) * 32);
+        const detH = Math.max(32, Math.round(page.height * scale / 32) * 32);
+        const input = new Float32Array(3 * detH * detW);
+        this.resizeToCHW(page, detW, detH, input);
+        const detBuffer = new ArrayBuffer(input.length * 4);
+        new Float32Array(detBuffer).set(input);
+        const detShape: number[] = [1, 3, detH, detW];
+        const tensor = new OnnxTensor(detBuffer, detShape, 0);
+        let result: OnnxResult | undefined = undefined;
+        try {
+            const inputs: Record<string, OnnxValue> = {};
+            inputs['x'] = tensor;
+            result = this.detSession!.Run(inputs);
+            const outName = this.detSession!.GetOutputNames()[0];
+            const outValue = result.GetValueByName(outName);
+            if (outValue.GetType() !== 1) {
+                return [];
+            }
+            const outTensor = outValue as OnnxTensor;
+            const info: TensorInfo = outTensor.GetInfo();
+            const shape: number[] = info.GetShape();
+            const predH = shape[shape.length - 2];
+            const predW = shape[shape.length - 1];
+            const data = new Float32Array(outTensor.GetDataAsArrayBuffer());
+            return this.components(data, predW, predH, page.width, page.height);
+        }
+        finally {
+            tensor.Close();
+            if (result !== undefined) {
+                result.Close();
+            }
+        }
+    }
+    /** 3x3 膨胀 + 连通域 + 轴对齐框（映射回原图坐标）。 */
+    private components(data: Float32Array, predW: number, predH: number, srcW: number, srcH: 
+number): Array<CandidateBox> {
+        const mask = new Uint8Array(predW * predH);
+        for (let i = 0; i < mask.length; i++) {
+            mask[i] = data[i] > DET_THRESH ? 1 : 0;
+        }
+        // 可分离膨胀（半径 3），把相邻笔画/字符连成文本行；竖排日文也能连上。
+        const radius = 3;
+        const tmp = new Uint8Array(mask.length);
+        for (let y = 0; y < predH; y++) {
+            for (let x = 0; x < predW; x++) {
+                if (mask[y * predW + x] === 0) {
+                    continue;
+                }
+                const x0 = Math.max(0, x - radius);
+                const x1 = Math.min(predW - 1, x + radius);
+                for (let nx = x0; nx <= x1; nx++) {
+                    tmp[y * predW + nx] = 1;
+                }
+            }
+        }
+        const dilated = new Uint8Array(mask.length);
+        for (let y = 0; y < predH; y++) {
+            for (let x = 0; x < predW; x++) {
+                if (tmp[y * predW + x] === 0) {
+                    continue;
+                }
+                const y0 = Math.max(0, y - radius);
+                const y1 = Math.min(predH - 1, y + radius);
+                for (let ny = y0; ny <= y1; ny++) {
+                    dilated[ny * predW + x] = 1;
+                }
+            }
+        }
+        const visited = new Uint8Array(dilated.length);
+        const stack: Array<number> = [];
+        const boxes: Array<CandidateBox> = [];
+        const sx = srcW / predW;
+        const sy = srcH / predH;
+        for (let i = 0; i < dilated.length; i++) {
+            if (dilated[i] === 0 || visited[i] === 1) {
+                continue;
+            }
+            let minX = predW;
+            let maxX = 0;
+            let minY = predH;
+            let maxY = 0;
+            let count = 0;
+            stack.push(i);
+            visited[i] = 1;
+            while (stack.length > 0) {
+                const idx = stack.pop() as number;
+                const x = idx % predW;
+                const y = Math.floor(idx / predW);
+                count++;
+                if (x < minX) {
+                    minX = x;
+                }
+                if (x > maxX) {
+                    maxX = x;
+                }
+                if (y < minY) {
+                    minY = y;
+                }
+                if (y > maxY) {
+                    maxY = y;
+                }
+                if (x > 0 && dilated[idx - 1] === 1 && visited[idx - 1] === 0) {
+                    visited[idx - 1] = 1;
+                    stack.push(idx - 1);
+                }
+                if (x + 1 < predW && dilated[idx + 1] === 1 && visited[idx + 1] === 0) {
+                    visited[idx + 1] = 1;
+                    stack.push(idx + 1);
+                }
+                if (y > 0 && dilated[idx - predW] === 1 && visited[idx - predW] === 0) {
+                    visited[idx - predW] = 1;
+                    stack.push(idx - predW);
+                }
+                if (y + 1 < predH && dilated[idx + predW] === 1 && visited[idx + predW] === 0) {
+                    visited[idx + predW] = 1;
+                    stack.push(idx + predW);
+                }
+            }
+            if (count < 12) {
+                continue;
+            }
+            const box = new CandidateBox();
+            box.x = Math.max(0, Math.floor(minX * sx));
+            box.y = Math.max(0, Math.floor(minY * sy));
+            box.w = Math.min(srcW - box.x, Math.ceil((maxX - minX + 1) * sx));
+            box.h = Math.min(srcH - box.y, Math.ceil((maxY - minY + 1) * sy));
+            if (box.w < DET_MIN_SIZE || box.h < DET_MIN_SIZE) {
+                continue;
+            }
+            // unclip 近似：向外扩 12%，把紧贴的笔画/气泡边距包进识别框。
+            const ex = Math.round(box.w * 0.12);
+            const ey = Math.round(box.h * 0.12);
+            box.x = Math.max(0, box.x - ex);
+            box.y = Math.max(0, box.y - ey);
+            box.w = Math.min(srcW - box.x, box.w + ex * 2);
+            box.h = Math.min(srcH - box.y, box.h + ey * 2);
+            boxes.push(box);
+            if (boxes.length >= 80) {
+                break;
+            }
+        }
+        // 合并相近/重叠框，避免同一行被拆成字符碎片。
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (let i = 0; i < boxes.length; i++) {
+                for (let j = i + 1; j < boxes.length; j++) {
+                    const a = boxes[i];
+                    const b = boxes[j];
+                    const gap = 8;
+                    const near = a.x - gap <= b.x + b.w && b.x - gap <= a.x + a.w
+                        && a.y - gap <= b.y + b.h && b.y - gap <= a.y + a.h;
+                    if (near) {
+                        const x0 = Math.min(a.x, b.x);
+                        const y0 = Math.min(a.y, b.y);
+                        const x1 = Math.max(a.x + a.w, b.x + b.w);
+                        const y1 = Math.max(a.y + a.h, b.y + b.h);
+                        a.x = x0;
+                        a.y = y0;
+                        a.w = x1 - x0;
+                        a.h = y1 - y0;
+                        boxes.splice(j, 1);
+                        changed = true;
+                        break;
+                    }
+                }
+                if (changed) {
+                    break;
+                }
+            }
+        }
+        return boxes;
+    }
+    private recognizeBox(page: PagePixels, box: CandidateBox): string {
+        const pad = 2;
+        const x0 = Math.max(0, box.x - pad);
+        const y0 = Math.max(0, box.y - pad);
+        const x1 = Math.min(page.width, box.x + box.w + pad);
+        const y1 = Math.min(page.height, box.y + box.h + pad);
+        const cropW = Math.max(1, x1 - x0);
+        const cropH = Math.max(1, y1 - y0);
+        let recW = Math.ceil(REC_HEIGHT * cropW / cropH);
+        recW = Math.max(32, Math.ceil(recW / 32) * 32);
+        recW = Math.min(recW, 1280);
+        const input = new Float32Array(3 * REC_HEIGHT * recW);
+        for (let y = 0; y < REC_HEIGHT; y++) {
+            const sy = y0 + (y + 0.5) * cropH / REC_HEIGHT - 0.5;
+            for (let x = 0; x < recW; x++) {
+                if (x >= Math.ceil(REC_HEIGHT * cropW / cropH)) {
+                    continue;
+                }
+                const sx = x0 + (x + 0.5) * cropW / Math.ceil(REC_HEIGHT * cropW / cropH) - 0.5;
+                const rgb = this.sample(page, sx, sy);
+                const base = y * recW + x;
+                input[0 * REC_HEIGHT * recW + base] = (rgb[0] / 255 - 0.5) / 0.5;
+                input[1 * REC_HEIGHT * recW + base] = (rgb[1] / 255 - 0.5) / 0.5;
+                input[2 * REC_HEIGHT * recW + base] = (rgb[2] / 255 - 0.5) / 0.5;
+            }
+        }
+        const recBuffer = new ArrayBuffer(input.length * 4);
+        new Float32Array(recBuffer).set(input);
+        const recShape: number[] = [1, 3, REC_HEIGHT, recW];
+        const tensor = new OnnxTensor(recBuffer, recShape, 0);
+        let result: OnnxResult | undefined = undefined;
+        try {
+            const inputs: Record<string, OnnxValue> = {};
+            inputs['x'] = tensor;
+            result = this.recSession!.Run(inputs);
+            const outName = this.recSession!.GetOutputNames()[0];
+            const outValue = result.GetValueByName(outName);
+            if (outValue.GetType() !== 1) {
+                return '';
+            }
+            const outTensor = outValue as OnnxTensor;
+            const info: TensorInfo = outTensor.GetInfo();
+            const shape: number[] = info.GetShape();
+            const seqLen = shape[shape.length - 2];
+            const classes = shape[shape.length - 1];
+            const data = new Float32Array(outTensor.GetDataAsArrayBuffer());
+            let text = '';
+            let previous = -1;
+            for (let t = 0; t < seqLen; t++) {
+                const offset = t * classes;
+                let best = 0;
+                let prob = data[offset];
+                for (let c = 1; c < classes; c++) {
+                    if (data[offset + c] > prob) {
+                        best = c;
+                        prob = data[offset + c];
+                    }
+                }
+                if (best > 0 && best !== previous && best < this.dict.length) {
+                    text += this.dict[best];
+                }
+                previous = best;
+            }
+            return text;
+        }
+        finally {
+            tensor.Close();
+            if (result !== undefined) {
+                result.Close();
+            }
+        }
+    }
+    private resizeToCHW(page: PagePixels, dstW: number, dstH: number, out: Float32Array): void {
+        const plane = dstW * dstH;
+        for (let y = 0; y < dstH; y++) {
+            const sy = (y + 0.5) * page.height / dstH - 0.5;
+            for (let x = 0; x < dstW; x++) {
+                const sx = (x + 0.5) * page.width / dstW - 0.5;
+                const rgb = this.sample(page, sx, sy);
+                const idx = y * dstW + x;
+                out[idx] = (rgb[0] / 255 - 0.5) / 0.5;
+                out[plane + idx] = (rgb[1] / 255 - 0.5) / 0.5;
+                out[plane * 2 + idx] = (rgb[2] / 255 - 0.5) / 0.5;
+            }
+        }
+    }
+    private sample(page: PagePixels, fx: number, fy: number): Array<number> {
+        const x = Math.max(0, Math.min(page.width - 1, fx));
+        const y = Math.max(0, Math.min(page.height - 1, fy));
+        const x0 = Math.floor(x);
+        const y0 = Math.floor(y);
+        const x1 = Math.min(page.width - 1, x0 + 1);
+        const y1 = Math.min(page.height - 1, y0 + 1);
+        const wx = x - x0;
+        const wy = y - y0;
+        const i00 = (y0 * page.width + x0) * 4;
+        const i10 = (y0 * page.width + x1) * 4;
+        const i01 = (y1 * page.width + x0) * 4;
+        const i11 = (y1 * page.width + x1) * 4;
+        const out: Array<number> = [0, 0, 0];
+        for (let c = 0; c < 3; c++) {
+            const top = page.rgba[i00 + c] * (1 - wx) + page.rgba[i10 + c] * wx;
+            const bottom = page.rgba[i01 + c] * (1 - wx) + page.rgba[i11 + c] * wx;
+            out[c] = top * (1 - wy) + bottom * wy;
+        }
+        return out;
+    }
+}
+// ==================== 文件：corerender/src/main/ets/OverlayRenderer.ets ====================
+import { DisplayRect } from './Geometry';
+import { LayoutEngine, OverlayRegion, RenderOptions, TextLayout } from './LayoutEngine';
+import { OverlayItem } from './PageOverlay';
+
+type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+/** 覆盖层配色（白块底 + 文字色）；反色模式由调用方传入深底浅字。 */
+export class OverlayColors {
+  boxFill: string = '#FFFFFF';
+  textColor: string = '#1A1A1A';
+
+  static make(boxFill: string, textColor: string): OverlayColors {
+    const colors = new OverlayColors();
+    colors.boxFill = boxFill;
+    colors.textColor = textColor;
+    return colors;
+  }
+}
+
+/**
+ * Overlay painter.
+ *
+ * 坐标约定（QA-1 修复的关键）：
+ * - LayoutRun.x/y 是**页面坐标系**下字格中心的绝对坐标（由 LayoutEngine 算出）；
+ * - 屏幕绘制走 paintPlan：逐字做 x' = dx + x*scale、y' = dy + y*scale、
+ *   fontSize' = fontSize*scale，从而在目标分辨率上直接光栅化（文字清晰，不会被位图缩放糊掉）；
+ * - 导出离屏合成直接传 scale=1/dx=0/dy=0，像素坐标 1:1。
+ *
+ * ⚠️ 字体单位坑（本轮 AUTO 字号偏小/字距巨大的根因）：
+ * ArkUI Canvas 的**绘制坐标默认单位是 vp**，但 ctx.font 中不带单位的字号按 **px（物理像素）**
+ * 解释（官方 FAQ 示例写作 'bold 18vp sans-serif' 即为此意）。若在 vp 画布上写 '21px'，
+ * 实际只有 21 物理 px ≈ 6vp，而逐字坐标仍是 vp → 表现为“字号小了 density 倍、间距显得巨大”。
+ * 因此 paintPlan/drawText 需要显式指定字号单位：
+ * - 屏幕 Canvas（默认 vp 单位）→ fontUnit='vp'；
+ * - 导出 OffscreenCanvas（用 LengthMetricsUnit.PX 创建）→ fontUnit='px'。
+ */
+export class OverlayRenderer {
+  /**
+   * 组装 canvas font 字符串。
+   * ArkUI Canvas 的 ctx.font 字号按 **物理 px** 解释（坐标则是 vp），
+   * 所以屏幕路径要把 vp 字号换算成 px；导出 PX 画布本来就是 px，直接使用。
+   */
+  static fontOf(fontSize: number, fontUnit: string): string {
+    // 内置 Noto Sans CJK SC，由 Index.aboutToAppear 注册为 MoyiSans。
+    if (fontUnit === 'px') {
+      return fontSize + 'px MoyiSans';
+    }
+    return vp2px(fontSize) + 'px MoyiSans';
+  }
+
+  /** White base block covering the bubble area (display/page coords). */
+  static drawBox(ctx: Ctx2D, box: DisplayRect, fill: string = '#FFFFFF'): void {
+    ctx.fillStyle = fill;
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+  }
+
+  /** Draw already-laid-out characters (runs use the same coordinate space as the canvas). */
+  static drawText(ctx: Ctx2D, layout: TextLayout, color: string = '#1A1A1A',
+    fontUnit: string = 'vp'): void {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = color;
+    let lastFs = -1;
+    for (let i = 0; i < layout.runs.length; i++) {
+      const run = layout.runs[i];
+      if (Math.abs(run.fontSize - lastFs) > 0.01) {
+        ctx.font = OverlayRenderer.fontOf(run.fontSize, fontUnit);
+        lastFs = run.fontSize;
+      }
+      ctx.fillText(run.char, run.x, run.y);
+    }
+  }
+
+  /** White block + text in one call (legacy display-space path, vp canvas). */
+  static drawRegion(ctx: Ctx2D, region: OverlayRegion, layout: TextLayout,
+    color: string = '#1A1A1A', boxFill: string = '#FFFFFF', fontUnit: string = 'vp'): void {
+    OverlayRenderer.drawBox(ctx, region.box, boxFill);
+    OverlayRenderer.drawText(ctx, layout, color, fontUnit);
+  }
+
+  /** Layout + draw a bubble's text with the given render options (legacy path, vp canvas). */
+  static renderRegionText(ctx: Ctx2D, text: string, region: OverlayRegion,
+    opts: RenderOptions, color: string = '#1A1A1A', boxFill: string = '#FFFFFF',
+    fontUnit: string = 'vp'): TextLayout {
+    const layout = LayoutEngine.layout(text, region.box, opts);
+    OverlayRenderer.drawRegion(ctx, region, layout, color, boxFill, fontUnit);
+    return layout;
+  }
+
+  /** 页面坐标 → 显示坐标（contain-fit）。 */
+  static toDisplayRect(box: DisplayRect, scale: number, dx: number, dy: number): DisplayRect {
+    const r: DisplayRect = {
+      x: dx + box.x * scale,
+      y: dy + box.y * scale,
+      w: box.w * scale,
+      h: box.h * scale
+    };
+    return r;
+  }
+
+  /**
+   * 绘制页面坐标系排版结果：逐字变换到显示坐标后直接光栅化。
+   * @param scale contain-fit 比例（vp/页面px 或 px/页面px）
+   * @param dx/@param dy 居中偏移
+   * @param fontUnit 字号单位：vp 画布用 'vp'，PX 画布（导出）用 'px'
+   */
+  static paintPlan(ctx: Ctx2D, items: Array<OverlayItem>, scale: number, dx: number, dy: number,
+    colors: OverlayColors, fontUnit: string = 'vp'): void {
+    if (scale <= 0 || items.length === 0) {
+      return;
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const box = item.box;
+      if (colors.boxFill !== 'none') {
+        ctx.fillStyle = colors.boxFill;
+        ctx.fillRect(dx + box.x * scale, dy + box.y * scale, box.w * scale, box.h * scale);
+      }
+      const itemColor = item.textColor !== undefined && item.textColor.length > 0
+        ? item.textColor : colors.textColor;
+      const outline = itemColor.toUpperCase() === '#1A1A1A' ? '#FFFFFF' : '#1A1A1A';
+      ctx.fillStyle = itemColor;
+      let lastFs = -1;
+      const runs = item.layout.runs;
+      for (let k = 0; k < runs.length; k++) {
+        const run = runs[k];
+        const fs = run.fontSize * scale;
+        if (fs <= 0) {
+          continue;
+        }
+        if (Math.abs(fs - lastFs) > 0.01) {
+          ctx.font = OverlayRenderer.fontOf(fs, fontUnit);
+          lastFs = fs;
+        }
+        // 1px 级描边保证浅底黑字/深底白字都能读清。
+        ctx.lineWidth = Math.max(1, fs * 0.06);
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = outline;
+        ctx.strokeText(run.char, dx + run.x * scale, dy + run.y * scale);
+        ctx.fillText(run.char, dx + run.x * scale, dy + run.y * scale);
+      }
+    }
+  }
+
+  /**
+   * 单气泡便捷入口：在页面坐标排版后按 fit 变换绘制。
+   * 返回排版结果（供调试/自检查看 measuredFontSize 等）。
+   */
+  static paintFitted(ctx: Ctx2D, text: string, box: DisplayRect, opts: RenderOptions,
+    scale: number, dx: number, dy: number, colors: OverlayColors,
+    fontUnit: string = 'vp'): TextLayout {
+    const layout = LayoutEngine.layout(text, box, opts);
+    const item: OverlayItem = { box: box, text: text, layout: layout, merged: 1 };
+    const items: Array<OverlayItem> = [item];
+    OverlayRenderer.paintPlan(ctx, items, scale, dx, dy, colors, fontUnit);
+    return layout;
+  }
+
+  /** 绘制一个 OCR 框的版面（页面坐标排版 + fit 变换）。 */
+  static paintPageRegions(ctx: Ctx2D, text: string, pageBox: DisplayRect, opts: RenderOptions,
+    scale: number, dx: number, dy: number, colors: OverlayColors,
+    fontUnit: string = 'vp'): TextLayout {
+    return OverlayRenderer.paintFitted(ctx, text, pageBox, opts, scale, dx, dy, colors, 
+fontUnit);
+  }
+}
+// ==================== 文件：corerender/src/main/ets/LayoutEngine.ets ====================
+import { DisplayRect } from './Geometry';
+
+/** Text orientation inside bubbles. */
+export enum RenderOrientation {
+  HORIZONTAL = 0,
+  VERTICAL = 1,
+  /** 按检测框宽高自动选择横排/竖排（覆盖层逐框推断）。 */
+  AUTO = 2
+}
+
+/** Column flow direction for vertical text (manga default: RTL). */
+export enum VerticalDirection {
+  RTL = 0,
+  LTR = 1
+}
+
+export enum FontSizeMode {
+  AUTO = 0,
+  FIXED = 1
+}
+
+/**
+ * 全局渲染设置（preferences starflow_reader 持久化）。
+ * lineSpacing / charSpacing 为可选增量（×字号），0 表示自然间距；
+ * 作为可选字段保证既有调用方的对象字面量继续兼容。
+ */
+export interface RenderOptions {
+  orientation: RenderOrientation;
+  verticalDirection: VerticalDirection;
+  fontSizeMode: FontSizeMode;
+  fixedFontSize: number;
+  padding: number;
+  /** 额外行距（横排行距 / 竖排列距），单位 = ×字号，0 为自然间距。 */
+  lineSpacing?: number;
+  /** 额外字距（横排字距 / 竖排列内字距），单位 = ×字号，0 为自然间距。 */
+  charSpacing?: number;
+  /** 页面像素宽（可选）：用于把 OCR 框裁剪到页面内，避免白块越界。 */
+  pageWidth?: number;
+  /** 页面像素高（可选）。 */
+  pageHeight?: number;
+}
+
+/** One positioned character; x/y mark the char cell CENTER (display/page coords). */
+export interface LayoutRun {
+  char: string;
+  x: number;
+  y: number;
+  fontSize: number;
+}
+
+export interface TextLayout {
+  runs: Array<LayoutRun>;
+  truncated: boolean;
+  measuredFontSize: number;
+}
+
+/** A bubble region; box is in PAGE pixel coordinates (renderer applies the fit transform). */
+export interface OverlayRegion {
+  box: DisplayRect;
+  original: string;
+  translated: string;
+  /** 可选文字色（由去字底图采样得到）；空/未设时由渲染端默认色兜底。 */
+  textColor?: string;
+}
+
+/** Character width measurer; default approximation is deterministic for tests. */
+export interface CharMeasurer {
+  measure(char: string, fontSize: number): number;
+}
+
+/**
+ * 竖排列式回归自检（单测式，纯函数、无 UI 依赖）。
+ * 供阅读器设置面板 / 开发者工作台直接调用展示；不通过时 detail 给出实测值。
+ */
+export class SelfTestResult {
+  name: string = '';
+  passed: boolean = false;
+  detail: string = '';
+}
+
+export function makeSelfTestResult(name: string, passed: boolean, detail: string): 
+SelfTestResult {
+  const r: SelfTestResult = { name: name, passed: passed, detail: detail };
+  return r;
+}
+
+const MIN_FONT_AUTO = 1;
+const MIN_FONT_FIXED = 6;
+const MAX_FONT = 72;
+/** 横排自然行距系数。 */
+const H_LINE_RATIO = 1.3;
+/** 竖排列内自然字步进系数。 */
+const V_CHAR_RATIO = 1.08;
+/** 竖排列间自然步进系数。 */
+const V_COL_RATIO = 1.1;
+/** 竖排列距（列间空白）拉伸上限（×字号）：既能“列距拉伸铺满”，又不会散架。 */
+const MAX_COL_GAP = 2.5;
+const EPS = 0.01;
+const ELLIPSIS = '…';
+const NO_START_CHARS = '，。、！？；：…）」』】〉》,.!?;:)';
+
+/** 汉字/全角统一按 1 字宽，拉丁按比例；确定性便于单测。 */
+export class ApproxCharMeasurer implements CharMeasurer {
+  measure(char: string, fontSize: number): number {
+    if (char === ' ') {
+      return fontSize * 0.3;
+    }
+    const code = char.charCodeAt(0);
+    if (code < 0x80) {
+      const isAlnum = (code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5A) || (code 
+>= 0x61 && code <= 0x7A);
+      return isAlnum ? fontSize * 0.56 : fontSize * 0.5;
+    }
+    return fontSize;
+  }
+}
+
+export function defaultRenderOptions(): RenderOptions {
+  const o: RenderOptions = {
+    orientation: RenderOrientation.VERTICAL,
+    verticalDirection: VerticalDirection.RTL,
+    fontSizeMode: FontSizeMode.AUTO,
+    fixedFontSize: 16,
+    padding: 4,
+    lineSpacing: 0,
+    charSpacing: 0
+  };
+  return o;
+}
+
+export function makeOverlayRegion(box: DisplayRect, original: string, translated: string): 
+OverlayRegion {
+  const r: OverlayRegion = { box: box, original: original, translated: translated };
+  return r;
+}
+
+function emptyLayout(): TextLayout {
+  const t: TextLayout = { runs: [], truncated: false, measuredFontSize: 0 };
+  return t;
+}
+
+function isNoStart(c: string): boolean {
+  return NO_START_CHARS.indexOf(c) >= 0;
+}
+
+/** 点串成员（用于“点串绝不跨行/跨列”规则）。 */
+function isEllipsisDot(c: string): boolean {
+  return c === '…' || c === '.' || c === '。';
+}
+
+/** 拆成字符数组（保留代理对，去掉换行；竖排里换行没有意义）。 */
+function splitChars(text: string): Array<string> {
+  const chars: Array<string> = [];
+  let i = 0;
+  while (i < text.length) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xD800 && code <= 0xDBFF && i + 1 < text.length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xDC00 && next <= 0xDFFF) {
+        chars.push(text.substring(i, i + 2));
+        i += 2;
+        continue;
+      }
+    }
+    const ch = text.charAt(i);
+    if (ch !== '\n' && ch !== '\r') {
+      chars.push(ch);
+    }
+    i++;
+  }
+  return chars;
+}
+
+function resolvePadding(box: DisplayRect, padding: number): number {
+  const p = padding > 0 ? padding : 0;
+  const cap = Math.min(box.w, box.h) / 4;
+  return p < cap ? p : cap;
+}
+
+function spacingOf(raw: number | undefined): number {
+  if (raw === undefined) {
+    return 0;
+  }
+  return raw > 0 ? raw : 0;
+}
+
+/** 复制 RenderOptions 并覆盖间距（用于“保底不丢字”：放弃额外间距再排一次）。 */
+function optionsWithSpacing(opts: RenderOptions, lineSpacing: number, charSpacing: number): 
+RenderOptions {
+  const o: RenderOptions = {
+    orientation: opts.orientation,
+    verticalDirection: opts.verticalDirection,
+    fontSizeMode: opts.fontSizeMode,
+    fixedFontSize: opts.fixedFontSize,
+    padding: opts.padding,
+    lineSpacing: lineSpacing,
+    charSpacing: charSpacing
+  };
+  return o;
+}
+
+// ---------------- 横排 ----------------
+
+/**
+ * 横排贪心换行（含字距预算）：
+ * k 个字的行实际占 sum(width) + (k-1)*tracking，断行必须把 tracking 算进去。
+ */
+function wrapLines(chars: Array<string>, m: CharMeasurer, fs: number, maxWidth: number,
+  tracking: number): Array<Array<string>> {
+  const lines: Array<Array<string>> = [];
+  let cur: Array<string> = [];
+  let curW = 0;
+  for (let idx = 0; idx < chars.length; idx++) {
+    const c = chars[idx];
+    const w = m.measure(c, fs);
+    const addW = cur.length > 0 ? w + tracking : w;
+    if (cur.length > 0 && curW + addW > maxWidth + EPS) {
+      const lastChar = cur[cur.length - 1];
+      const lastW = m.measure(lastChar, fs);
+      if (isNoStart(c) && cur.length >= 2 && lastW + w + tracking <= maxWidth + EPS) {
+        cur.pop();
+        lines.push(cur);
+        cur = [lastChar];
+        curW = lastW;
+      } else {
+        lines.push(cur);
+        cur = [];
+        curW = 0;
+      }
+    }
+    if (cur.length > 0) {
+      curW += w + tracking;
+    } else {
+      curW = w;
+    }
+    cur.push(c);
+  }
+  if (cur.length > 0) {
+    lines.push(cur);
+  }
+  return lines;
+}
+
+/** 由已断好的行生成 runs：整块垂直居中、行内水平居中；字距/行距不做额外拉伸。 */
+function buildHorizontalRuns(lines: Array<Array<string>>, m: CharMeasurer, box: DisplayRect,
+  padding: number, fs: number, opts: RenderOptions): Array<LayoutRun> {
+  const runs: Array<LayoutRun> = [];
+  const bw = box.w - padding * 2;
+  const bh = box.h - padding * 2;
+  const tracking = spacingOf(opts.charSpacing) * fs;
+  // 行距只由用户设置决定（自然 1.3 + 额外行距），不为铺满额外拉伸；剩余空白整块居中。
+  const lead = fs * (H_LINE_RATIO + spacingOf(opts.lineSpacing));
+  const n = lines.length;
+  const blockH = (n - 1) * lead + fs;
+  const vOff = blockH < bh ? (bh - blockH) / 2 : 0;
+  for (let i = 0; i < n; i++) {
+    const line = lines[i];
+    let lw = 0;
+    for (let k = 0; k < line.length; k++) {
+      lw += m.measure(line[k], fs);
+    }
+    if (line.length > 1) {
+      lw += tracking * (line.length - 1);
+    }
+    let xCur = lw < bw ? (bw - lw) / 2 : 0;
+    const yCenter = vOff + fs / 2 + i * lead;
+    for (let k = 0; k < line.length; k++) {
+      const c = line[k];
+      const w = m.measure(c, fs);
+      const run: LayoutRun = {
+        char: c,
+        x: box.x + padding + xCur + w / 2,
+        y: box.y + padding + yCenter,
+        fontSize: fs
+      };
+      runs.push(run);
+      xCur += w + tracking;
+    }
+  }
+  return runs;
+}
+
+/** 横排试排；装不下返回 undefined（不做截断）。 */
+function tryHorizontal(chars: Array<string>, m: CharMeasurer, box: DisplayRect,
+  padding: number, fs: number, opts: RenderOptions): TextLayout | undefined {
+  const bw = box.w - padding * 2;
+  const bh = box.h - padding * 2;
+  if (bw <= 0 || bh <= 0) {
+    return undefined;
+  }
+  const tracking = spacingOf(opts.charSpacing) * fs;
+  const lines = wrapLines(chars, m, fs, bw, tracking);
+  if (lines.length === 0) {
+    return undefined;
+  }
+  const lead = fs * (H_LINE_RATIO + spacingOf(opts.lineSpacing));
+  const blockH = (lines.length - 1) * lead + fs;
+  if (blockH > bh + EPS) {
+    return undefined;
+  }
+  const runs = buildHorizontalRuns(lines, m, box, padding, fs, opts);
+  const t: TextLayout = { runs: runs, truncated: false, measuredFontSize: fs };
+  return t;
+}
+
+// ---------------- 竖排 ----------------
+
+/** 竖排每列可容纳字符数：末字下边缘必须落在可用高内。 */
+function verticalCapacity(bh: number, fs: number, charStep: number): number {
+  if (charStep <= 0 || bh < fs) {
+    return 0;
+  }
+  return Math.floor((bh - fs) / charStep) + 1;
+}
+
+/**
+ * 按列容量切分，列内自上而下逐字（顺序即 runs 顺序）；
+ * 切点绝不落在点串内部（三个点的省略号整串进下一列）。
+ */
+function wrapColumns(chars: Array<string>, cap: number): Array<Array<string>> {
+  const cols: Array<Array<string>> = [];
+  if (cap < 1) {
+    return cols;
+  }
+  let i = 0;
+  while (i < chars.length) {
+    let end = i + cap < chars.length ? i + cap : chars.length;
+    if (end < chars.length && isEllipsisDot(chars[end - 1]) && isEllipsisDot(chars[end])) {
+      let runStart = end - 1;
+      while (runStart > i && isEllipsisDot(chars[runStart - 1])) {
+        runStart--;
+      }
+      if (runStart > i) {
+        end = runStart;
+      }
+    }
+    const col: Array<string> = [];
+    for (let k = i; k < end; k++) {
+      col.push(chars[k]);
+    }
+    cols.push(col);
+    i = end;
+  }
+  return cols;
+}
+
+/**
+ * 竖排试排（页面坐标）：列从右到左（RTL）或左到右（LTR），列内自上而下；
+    if (data.trim() === '[DONE]') {
+      this.callbacks.onDone();
+      return;
+    }
+    this.callbacks.onEvent(data);
+  }
+}
 // ==================== 文件：commons/Index.ets ====================
 /**
  * commons HAR entry.
@@ -635,1508 +2137,6 @@ export default function localUnitTest() {
       expect(body.indexOf('key=key456') >= 0).assertTrue();
     });
   });
-}
-// ==================== 文件：entry/src/main/ets/entryability/EntryAbility.ets ====================
-/*
- * Copyright (c) 2026 MoyiOhos contributors.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- */
-
-import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
-import { window } from '@kit.ArkUI';
-import { preferences } from '@kit.ArkData';
-import { BusinessError } from '@kit.BasicServicesKit';
-import { AppEnv } from '../common/AppEnv';
-import { OcrService } from 'coreocr';
-import { PageTranslateService } from '../service/PageTranslateService';
-import { Log, ThemeTokens } from 'commons';
-
-/** App shell: persisted palette (蓝白/蓝黑) is applied before loadContent; 旧紫色值迁移到蓝白。 */
-export default class EntryAbility extends UIAbility {
-  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    let mode = 'blue';
-    try {
-      const store = preferences.getPreferencesSync(this.context, { name: 'starflow_settings' });
-      const saved = store.getSync('theme_mode', 'blue');
-      mode = saved as string;
-      mode = mode === 'blueDark' ? 'blueDark' : 'blue';
-    } catch (e) {
-      Log.warn('EntryAbility', 'theme preference read failed: ' + JSON.stringify(e));
-    }
-    ThemeTokens.applyMode(mode);
-    try {
-      this.context.getApplicationContext().setColorMode(mode === 'blue'
-        ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT
-        : ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
-    } catch (err) {
-      Log.error('EntryAbility', `Failed to set colorMode. Cause: ${JSON.stringify(err)}`);
-    }
-    // Application-wide assembly: context, RDB init, engine registry,
-    // local model path restore (plan: common/AppEnv.ets). Fire-and-forget;
-    // pages await AppEnv.ready() before touching the database.
-    AppEnv.init(this.context).catch((e: Object) => {
-      Log.error('EntryAbility', `AppEnv init failed: ${e}`);
-    });
-    Log.info('EntryAbility', 'Ability onCreate');
-  }
-
-  onDestroy(): void {
-    Log.info('EntryAbility', 'Ability onDestroy');
-  }
-
-  onWindowStageCreate(windowStage: window.WindowStage): void {
-    Log.info('EntryAbility', 'Ability onWindowStageCreate');
-    windowStage.loadContent('pages/Index', (err) => {
-      if (err.code) {
-        Log.error('EntryAbility', `Failed to load the content. Cause: ${JSON.stringify(err)}`);
-        return;
-      }
-      Log.info('EntryAbility', 'Succeeded in loading the content.');
-      this.configureWindow(windowStage);
-      // 系统 OCR 首次 init 在真机上可能耗时数十秒；启动后后台预热，避免首张漫画翻译被冷启动拖到 1 分钟。
-      setTimeout(() => {
-        OcrService.getInstance().ensureInit().catch((e: Error) => {
-          Log.warn('EntryAbility', 'OCR prewarm skipped: ' + e.message);
-        });
-        PageTranslateService.prewarm().catch((e: Error) => {
-          Log.warn('EntryAbility', 'local OCR/model prewarm skipped: ' + e.message);
-        });
-      }, 1500);
-      // 本地 GGUF 首次加载 1–3s；启动后预热，避免首句翻译超时。
-      setTimeout(() => {
-        const translator = AppEnv.getInstance().getLocalTranslator();
-        if (translator !== undefined) {
-          translator.prewarm().catch((e: Error) => {
-            Log.warn('EntryAbility', 'local llama prewarm skipped: ' + e.message);
-          });
-        }
-      }, 3000);
-    });
-  }
-
-  /**
-   * System bar + window chrome: blue-white / blue-black background matching the theme.
-   * Works for phone / tablet / 2in1 (window chrome is managed by the system on PC).
-   */
-  private configureWindow(windowStage: window.WindowStage): void {
-    try {
-      const mainWindow: window.Window = windowStage.getMainWindowSync();
-      mainWindow.setWindowLayoutFullScreen(true).catch((e: BusinessError) => {
-        Log.warn('EntryAbility', `setWindowLayoutFullScreen failed: ${e.message}`);
-      });
-      mainWindow.setWindowBackgroundColor(ThemeTokens.SURFACE);
-      mainWindow.setWindowSystemBarProperties({
-        statusBarColor: ThemeTokens.SURFACE,
-        statusBarContentColor: ThemeTokens.isLight() ? '#0F2742' : '#FFFFFF',
-        navigationBarColor: ThemeTokens.SURFACE,
-        navigationBarContentColor: ThemeTokens.isLight() ? '#0F2742' : '#FFFFFF'
-      }).catch((e: BusinessError) => {
-        Log.warn('EntryAbility', `setWindowSystemBarProperties failed: ${e.message}`);
-      });
-    } catch (e) {
-      Log.warn('EntryAbility', `configureWindow failed: ${e}`);
-    }
-  }
-
-  onWindowStageDestroy(): void {
-    Log.info('EntryAbility', 'Ability onWindowStageDestroy');
-  }
-
-  onForeground(): void {
-    Log.info('EntryAbility', 'Ability onForeground');
-  }
-
-  onBackground(): void {
-    Log.info('EntryAbility', 'Ability onBackground');
-  }
-}
-// ==================== 文件：entry/src/main/ets/pages/AboutPage.ets ====================
-import { uiMaterial } from '@kit.ArkUI';
-import { ThemeTokens, WindowSizeClass, observeBreakpoint } from 'commons';
-import { AppEnv } from '../common/AppEnv';
-import { BuildInfo } from '../common/BuildInfo';
-import { Routes } from '../common/Routes';
-
-/** 信息行。 */
-class InfoRow {
-  label: string;
-  value: string;
-
-  constructor(label: string, value: string) {
-    this.label = label;
-    this.value = value;
-  }
-}
-
-/** 卡片容器。 */
-@Component
-struct AboutCard {
-  @BuilderParam content: () => void;
-
-  build() {
-    Column() {
-      this.content()
-    }
-    .width('100%')
-    .padding(ThemeTokens.CARD_PADDING)
-    .borderRadius(ThemeTokens.RADIUS_CARD)
-    .backgroundColor(ThemeTokens.CARD_BG)
-    .alignItems(HorizontalAlign.Start)
-  }
-}
-
-/**
- * 关于页（S110）：品牌、版本、构建模块清单（1 HAP + 6 HAR）、技术栈、
- * 许可与来源、快捷入口（开源致谢 / 常见问题 / 重新查看引导）。
- */
-@Component
-export struct AboutPage {
-  @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
-  private navStack: NavPathStack = AppEnv.getInstance().navStack;
-  private stopBreakpoint: (() => void) | undefined = undefined;
-  private rows: Array<InfoRow> = [
-    new InfoRow('应用版本', `v${BuildInfo.APP_VERSION}`),
-    new InfoRow('Bundle 名称', BuildInfo.BUNDLE_NAME),
-    new InfoRow('API Level', `HarmonyOS ${BuildInfo.HARMONY_API_LEVEL}`),
-    new InfoRow('构建日期', BuildInfo.BUILD_DATE),
-    new InfoRow('设备形态', 'phone · tablet · 2in1')
-  ];
-
-  aboutToAppear(): void {
-    this.stopBreakpoint = observeBreakpoint((c: WindowSizeClass) => {
-      this.sizeClass = c;
-    });
-  }
-
-  aboutToDisappear(): void {
-    if (this.stopBreakpoint !== undefined) {
-      this.stopBreakpoint();
-      this.stopBreakpoint = undefined;
-    }
-  }
-
-  private isWide(): boolean {
-    return this.sizeClass === WindowSizeClass.LG;
-  }
-
-  @Builder
-  sectionTitle(title: string) {
-    Text(title)
-      .fontSize(ThemeTokens.FONT_BODY)
-      .fontWeight(FontWeight.Medium)
-      .fontColor(ThemeTokens.TEXT_PRIMARY)
-      .width('100%')
-      .margin({ top: 6, bottom: 2 })
-  }
-
-  @Builder
-  infoLine(row: InfoRow) {
-    Row() {
-      Text(row.label)
-        .fontSize(ThemeTokens.FONT_SMALL)
-        .fontColor(ThemeTokens.TEXT_SECONDARY)
-      Blank()
-      Text(row.value)
-        .fontSize(ThemeTokens.FONT_SMALL)
-        .fontColor(ThemeTokens.TEXT_PRIMARY)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-    }
-    .width('100%')
-    .padding({ top: 7, bottom: 7 })
-    .alignItems(VerticalAlign.Center)
-  }
-
-  @Builder
-  moduleChip(name: string, hap: boolean) {
-    Text(name)
-      .fontSize(ThemeTokens.FONT_SMALL)
-      .fontColor(hap ? ThemeTokens.TEXT_ON_PRIMARY : ThemeTokens.PRIMARY_SOFT)
-      .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-      .borderRadius(ThemeTokens.RADIUS_PILL)
-      .backgroundColor(hap ? ThemeTokens.PRIMARY : ThemeTokens.SURFACE_VARIANT)
-      .margin({ right: 6, bottom: 6 })
-  }
-
-  @Builder
-  hero() {
-    Column({ space: 8 }) {
-      Image($r('app.media.logo_starflow'))
-        .width(72)
-        .height(72)
-        .borderRadius(20)
-      Text('墨译 Moyi')
-        .fontSize(ThemeTokens.FONT_DISPLAY)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(ThemeTokens.TEXT_PRIMARY)
-      Text('漫画 · 小说 · 文本翻译 · 本地模型')
-        .fontSize(ThemeTokens.FONT_CAPTION)
-        .fontColor(ThemeTokens.TEXT_SECONDARY)
-      Row({ space: 8 }) {
-        Text(`v${BuildInfo.APP_VERSION}`)
-          .fontSize(ThemeTokens.FONT_SMALL)
-          .fontColor(ThemeTokens.PRIMARY)
-          .padding({ left: 9, right: 9, top: 3, bottom: 3 })
-          .borderRadius(ThemeTokens.RADIUS_PILL)
-          .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-        Text('HarmonyOS · 蓝白阅读')
-          .fontSize(ThemeTokens.FONT_SMALL)
-          .fontColor(ThemeTokens.TEXT_HINT)
-          .padding({ left: 9, right: 9, top: 3, bottom: 3 })
-          .borderRadius(ThemeTokens.RADIUS_PILL)
-          .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-      }
-    }
-    .width('100%')
-    .padding({ top: 14, bottom: 10 })
-    .alignItems(HorizontalAlign.Center)
-    .justifyContent(FlexAlign.Center)
-  }
-
-  build() {
-    NavDestination() {
-      Scroll() {
-        Row() {
-          Column({ space: 12 }) {
-            this.hero()
-
-            this.sectionTitle('版本与构建')
-            AboutCard() {
-              ForEach(this.rows, (row: InfoRow, index: number) => {
-                if (index > 0) {
-                  Divider()
-                    .color(ThemeTokens.DIVIDER)
-                    .strokeWidth(0.5)
-                }
-                this.infoLine(row)
-              }, (row: InfoRow) => row.label)
-            }
-
-            this.sectionTitle(`构建模块（1 HAP + ${BuildInfo.MODULES.length - 1} HAR）`)
-            AboutCard() {
-              Flex({ wrap: FlexWrap.Wrap }) {
-                ForEach(BuildInfo.MODULES, (m: string) => {
-                  this.moduleChip(m, m.indexOf('(HAP)') >= 0)
-                }, (m: string) => m)
-              }
-              .width('100%')
-              Text(`共 ${BuildInfo.MODULE_COUNT} 个模块；entry 为 HAP，其余为可复用 HAR。构建产物由 
-devecocli（DevEco 26 / API 26）生成。`)
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.TEXT_HINT)
-                .width('100%')
-                .lineHeight(17)
-                .margin({ top: 2 })
-            }
-
-            this.sectionTitle('技术栈')
-            AboutCard() {
-              Text('ArkTS + ArkUI 声明式开发（V1 状态管理）· 关系型数据库 RDB · Preferences 设置持久化 · Asset Store 
-Kit 密钥存储 · uiMaterial 沉浸光感（API 26）· Core Vision Kit 文字识别 · llama.cpp NAPI 端侧推理。')
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.TEXT_SECONDARY)
-                .width('100%')
-                .lineHeight(19)
-            }
-
-            this.sectionTitle('许可与来源')
-            AboutCard() {
-              Text('本应用参照上游开源项目 StarFlow（星译，LGPL-3.0）的信息架构与行为，在 HarmonyOS 上以 ArkTS 
-独立重写实现，未直接复制上游代码文本。')
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.TEXT_SECONDARY)
-                .width('100%')
-                .lineHeight(19)
-              Divider()
-                .color(ThemeTokens.DIVIDER)
-                .strokeWidth(0.5)
-                .margin({ top: 8, bottom: 8 })
-              Text('llama.cpp（MIT）用于本地 GGUF 推理；OCR 能力来自 HarmonyOS Core Vision Kit；本地模型 Hy-MT2 
-的版权与许可归腾讯混元。完整列表见「开源致谢」。')
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.TEXT_SECONDARY)
-                .width('100%')
-                .lineHeight(19)
-              Text('数据默认保存在本机；应用不含广告、内购与统计 SDK，也无账号体系。')
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.TEXT_HINT)
-                .width('100%')
-                .lineHeight(19)
-                .margin({ top: 8 })
-            }
-
-            Row({ space: 10 }) {
-              Button('开源致谢')
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
-                .backgroundColor(ThemeTokens.PRIMARY)
-                .borderRadius(ThemeTokens.RADIUS_PILL)
-                .height(36)
-                .layoutWeight(1)
-                .onClick(() => {
-                  this.navStack.pushPathByName(Routes.OPEN_SOURCE, '');
-                })
-              Button('常见问题')
-                .fontSize(ThemeTokens.FONT_SMALL)
-                .fontColor(ThemeTokens.TEXT_SECONDARY)
-                .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-                .borderRadius(ThemeTokens.RADIUS_PILL)
-                .height(36)
-                .layoutWeight(1)
-                .onClick(() => {
-                  this.navStack.pushPathByName(Routes.FAQ, '');
-                })
-            }
-            .width('100%')
-
-            Button('重新查看引导')
-              .fontSize(ThemeTokens.FONT_SMALL)
-              .fontColor(ThemeTokens.TEXT_SECONDARY)
-              .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-              .borderRadius(ThemeTokens.RADIUS_PILL)
-              .height(36)
-              .width('100%')
-              .onClick(() => {
-                this.navStack.pushPathByName(Routes.ONBOARDING, '');
-              })
-
-            Text('MoyiOhos · 阶段2 · 蓝白阅读')
-              .fontSize(10)
-              .fontColor(ThemeTokens.TEXT_TERTIARY)
-              .width('100%')
-              .textAlign(TextAlign.Center)
-              .margin({ top: 6, bottom: 12 })
-          }
-          .width(this.isWide() ? 760 : '100%')
-          .padding({
-            left: ThemeTokens.PAGE_PADDING,
-            right: ThemeTokens.PAGE_PADDING,
-            top: 4,
-            bottom: 24
-          })
-          .alignItems(HorizontalAlign.Start)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .alignItems(VerticalAlign.Top)
-      }
-      .scrollBar(BarState.Off)
-      .width('100%')
-      .height('100%')
-    }
-    .title('关于', {
-      systemMaterial: new uiMaterial.ImmersiveMaterial({
-        style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        colorInvert: true,
-        interactive: true,
-        lightEffect: {}
-      })
-    })
-    .backgroundColor(ThemeTokens.SURFACE)
-  }
-}
-// ==================== 文件：entry/src/main/ets/pages/ApiConfigPage.ets ====================
-import fs from '@ohos.file.fs';
-import { uiMaterial } from '@kit.ArkUI';
-import { ThemeTokens, WindowSizeClass, observeBreakpoint, Log } from 'commons';
-import { EngineType, OpenAiConfig, TranslateRequest } from 'coretranslate';
-import { AppEnv } from '../common/AppEnv';
-import { Routes } from '../common/Routes';
-import { DownloadRepository } from '../data/DownloadRepository';
-import { SettingsKeys, SettingsRepository } from '../data/SettingsRepository';
-
-const KEY_ALIAS_OPENAI = SettingsKeys.OPENAI_KEY_ALIAS;
-const TAG = 'ApiConfigPage';
-
-/** OpenAI 兼容厂商预设。 */
-class ProviderPreset {
-  id: string;
-  name: string;
-  baseUrl: string;
-  model: string;
-  desc: string;
-
-  constructor(id: string, name: string, baseUrl: string, model: string, desc: string) {
-    this.id = id;
-    this.name = name;
-    this.baseUrl = baseUrl;
-    this.model = model;
-    this.desc = desc;
-  }
-}
-
-/** 引擎状态徽标。 */
-class EngineStatus {
-  text: string;
-  color: string;
-
-  constructor(text: string, color: string) {
-    this.text = text;
-    this.color = color;
-  }
-}
-
-/** @Builder 按引用传递参数（引擎状态/选中态变化可刷新 UI）。 */
-interface EngineBadgeParams {
-  status: EngineStatus;
-}
-
-interface EngineRowParams {
-  title: string;
-  desc: string;
-  icon: Resource;
-  status: EngineStatus;
-  active: boolean;
-  onTap: () => void;
-}
-
-/** 设置卡片容器。 */
-@Component
-struct ApiCard {
-  @BuilderParam content: () => void;
-
-  build() {
-    Column() {
-      this.content()
-    }
-    .width('100%')
-    .padding(ThemeTokens.CARD_PADDING)
-    .borderRadius(ThemeTokens.RADIUS_CARD)
-    .backgroundColor(ThemeTokens.CARD_BG)
-    .alignItems(HorizontalAlign.Start)
-  }
-}
-
-/**
- * API 配置页（S107）：引擎列表（必应 / OpenAI 兼容 / 本地 llama）+ 厂商预设、
- * Base URL / 模型 / Key 掩码配置弹窗、连通性测试与状态徽标。
- * Key 存 AssetKeyStore（alias=openai_api_key，与 translate-dev 一致，掩码不回显）。
- */
-@Component
-export struct ApiConfigPage {
-  @State engineType: number = 0;
-  @State provider: string = 'openai';
-  @State baseUrl: string = '';
-  @State model: string = '';
-  @State hasKey: boolean = false;
-  @State lowSecurity: boolean = false;
-  @State showConfig: boolean = false;
-  @State draftProvider: string = 'openai';
-  @State draftBaseUrl: string = '';
-  @State draftModel: string = '';
-  @State draftKey: string = '';
-  @State testing: boolean = false;
-  @State testOk: boolean = false;
-  @State testMessage: string = '';
-  @State testingEngine: boolean = false;
-  @State engineTestOk: boolean = false;
-  @State engineTestMessage: string = '';
-  @State localModelLabel: string = '';
-  @State localModelReady: boolean = false;
-  @State hint: string = '';
-  @State sizeClass: WindowSizeClass = WindowSizeClass.SM;
-  private navStack: NavPathStack = AppEnv.getInstance().navStack;
-  private stopBreakpoint: (() => void) | undefined = undefined;
-  private providers: Array<ProviderPreset> = [
-    new ProviderPreset('openai', 'OpenAI', 'https://api.openai.com/v1', 'gpt-4o-mini', 'OpenAI 
-官方或同协议端点'),
-    new ProviderPreset('deepseek', 'DeepSeek', 'https://api.deepseek.com/v1', 'deepseek-chat', 
-'深度求索，中文表现好'),
-    new ProviderPreset('qwen', '通义千问', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 
-'qwen-plus', '阿里云 DashScope 兼容模式'),
-    new ProviderPreset('doubao', '豆包', 'https://ark.cn-beijing.volces.com/api/v3', 
-'doubao-pro-32k', '火山方舟 Ark 兼容端点'),
-    new ProviderPreset('zhipu', '智谱 GLM', 'https://open.bigmodel.cn/api/paas/v4', 'glm-4-flash',
- '智谱开放平台'),
-    new ProviderPreset('custom', '自定义', '', '', '任意 OpenAI 兼容 Base URL 与模型名')
-  ];
-
-  aboutToAppear(): void {
-    this.stopBreakpoint = observeBreakpoint((c: WindowSizeClass) => {
-      this.sizeClass = c;
-    });
-    this.load();
-  }
-
-  aboutToDisappear(): void {
-    if (this.stopBreakpoint !== undefined) {
-      this.stopBreakpoint();
-      this.stopBreakpoint = undefined;
-    }
-  }
-
-  private async load(): Promise<void> {
-    this.engineType = await SettingsRepository.getNumber(SettingsKeys.ENGINE_TYPE, 0);
-    this.provider = await SettingsRepository.getString(SettingsKeys.API_PROVIDER, 'openai');
-    this.baseUrl = await SettingsRepository.getString(SettingsKeys.OPENAI_BASE_URL, 
-'https://api.openai.com/v1');
-    this.model = await SettingsRepository.getString(SettingsKeys.OPENAI_MODEL, '');
-    const key = await AppEnv.getInstance().getKeyStore().load(KEY_ALIAS_OPENAI);
-    this.hasKey = key !== undefined && key.length > 0;
-    this.lowSecurity = AppEnv.getInstance().getKeyStore().isLowSecurityMode();
-    await this.detectLocalModel();
-  }
-
-  /** 检测本地 GGUF 是否已下载/导入（只读 DownloadRepository）。 */
-  private async detectLocalModel(): Promise<void> {
-    try {
-      await AppEnv.ready();
-      const tasks = await DownloadRepository.listAll();
-      for (const task of tasks) {
-        const path = task.localPath ?? '';
-        if (path.length === 0) {
-          continue;
-        }
-        let exists = false;
-        try {
-          exists = fs.accessSync(path);
-        } catch (e) {
-          exists = false;
-        }
-        if (exists) {
-          this.localModelLabel = task.displayName.length > 0 ? task.displayName : path;
-          this.localModelReady = true;
-          return;
-        }
-      }
-      this.localModelLabel = '';
-      this.localModelReady = false;
-    } catch (e) {
-      this.localModelLabel = '';
-      this.localModelReady = false;
-    }
-  }
-
-  private flash(text: string): void {
-    this.hint = text;
-    setTimeout(() => {
-      if (this.hint === text) {
-        this.hint = '';
-      }
-    }, 1600);
-  }
-
-  private bingStatus(): EngineStatus {
-    return new EngineStatus('免 Key · 在线', ThemeTokens.SUCCESS);
-  }
-
-  private openAiStatus(): EngineStatus {
-    if (this.baseUrl.length === 0 || this.model.length === 0) {
-      return new EngineStatus('未配置', ThemeTokens.WARN);
-    }
-    if (!this.hasKey) {
-      return new EngineStatus('缺 API Key', ThemeTokens.WARN);
-    }
-    return new EngineStatus('已配置', ThemeTokens.SUCCESS);
-  }
-
-  private localStatus(): EngineStatus {
-    if (this.localModelReady) {
-      return new EngineStatus('模型就绪', ThemeTokens.SUCCESS);
-    }
-    return new EngineStatus('未下载模型', ThemeTokens.TEXT_HINT);
-  }
-
-  private providerName(id: string): string {
-    for (const p of this.providers) {
-      if (p.id === id) {
-        return p.name;
-      }
-    }
-    if (id === 'bing') {
-      return '未选择厂商';
-    }
-    return '自定义';
-  }
-
-  /** 应用已持久化的 OpenAI 配置到运行时引擎（取消/测试后回滚用）。 */
-  private async applySavedConfig(): Promise<void> {
-    const base = await SettingsRepository.getString(SettingsKeys.OPENAI_BASE_URL, '');
-    const model = await SettingsRepository.getString(SettingsKeys.OPENAI_MODEL, '');
-    const key = await AppEnv.getInstance().getKeyStore().load(KEY_ALIAS_OPENAI);
-    const translator = AppEnv.getInstance().getOpenAiTranslator();
-    if (translator !== undefined) {
-      translator.setConfig(new OpenAiConfig(base, key ?? '', model));
-    }
-  }
-
-  /** 取消配置弹窗：把测试时写入运行时的草稿配置回滚为已保存配置。 */
-  private async cancelConfig(): Promise<void> {
-    await this.applySavedConfig();
-    this.showConfig = false;
-  }
-
-  /** 测试当前默认引擎连通性（必应实译一词 / OpenAI 兼容列模型 / 本地查模型文件）。 */
-  private async testCurrent(): Promise<void> {
-    if (this.testingEngine) {
-      return;
-    }
-    this.testingEngine = true;
-    try {
-      await AppEnv.ready();
-    } catch (ignore) {
-      // 引擎/数据库未就绪时继续走下面的失败分支
-    }
-    this.engineTestMessage = '';
-    this.engineTestOk = false;
-    try {
-      if (this.engineType === 0) {
-        const translator = AppEnv.getInstance().engineRegistry.get(EngineType.BING);
-        const req: TranslateRequest = { text: 'hello', from: 'en', to: 'zh' };
-        const result = await translator.translate(req);
-        this.engineTestOk = true;
-        this.engineTestMessage = `必应连通：hello → ${result}`;
-      } else if (this.engineType === 1) {
-        await this.applySavedConfig();
-        const translator = AppEnv.getInstance().getOpenAiTranslator();
-        if (translator === undefined) {
-          throw new Error('OpenAI 兼容引擎未注册');
-        }
-        const models = await translator.listModels();
-        this.engineTestOk = true;
-        this.engineTestMessage = `OpenAI 兼容连通：端点返回 ${models.length} 个模型`;
-      } else {
-        if (this.localModelReady) {
-          this.engineTestOk = true;
-          this.engineTestMessage = `本地模型已就绪：${this.localModelLabel}`;
-        } else {
-          throw new Error('尚未下载本地 GGUF 模型');
-        }
-      }
-    } catch (e) {
-      const err = e as Error;
-      this.engineTestOk = false;
-      this.engineTestMessage = `测试失败：${err !== undefined && err.message !== undefined ? 
-err.message : e}`;
-      Log.warn(TAG, `testCurrent failed: ${this.engineTestMessage}`);
-    }
-    this.testingEngine = false;
-  }
-
-  private async selectBing(): Promise<void> {
-    this.engineType = 0;
-    await SettingsRepository.set(SettingsKeys.ENGINE_TYPE, 0);
-    await SettingsRepository.set(SettingsKeys.API_PROVIDER, 'bing');
-    this.flash('默认引擎已切换为必应');
-  }
-
-  private async selectLocal(): Promise<void> {
-    this.engineType = 2;
-    await SettingsRepository.set(SettingsKeys.ENGINE_TYPE, 2);
-    this.flash(this.localModelReady ? '默认引擎已切换为本地 llama' : '请先在模型管理下载 GGUF 模型');
-  }
-
-  private openConfigDialog(): void {
-    this.draftProvider = this.provider === 'bing' ? 'openai' : this.provider;
-    this.draftBaseUrl = this.baseUrl;
-    this.draftModel = this.model;
-    this.draftKey = '';
-    this.testMessage = '';
-    this.testOk = false;
-    this.showConfig = true;
-  }
-
-  private pickProvider(id: string): void {
-    this.draftProvider = id;
-    for (const p of this.providers) {
-      if (p.id === id) {
-        if (id !== 'custom') {
-          this.draftBaseUrl = p.baseUrl;
-          this.draftModel = p.model;
-        }
-        return;
-      }
-    }
-  }
-
-  /** 用当前草稿 + 已保存 Key 测试 OpenAI 兼容端点。 */
-  private async testConnection(): Promise<void> {
-    if (this.testing) {
-      return;
-    }
-    this.testing = true;
-    this.testMessage = '';
-    this.testOk = false;
-    try {
-      await AppEnv.ready();
-      const translator = AppEnv.getInstance().getOpenAiTranslator();
-      if (translator === undefined) {
-        throw new Error('OpenAI 兼容引擎未注册');
-      }
-      let key = this.draftKey.trim();
-      if (key.length === 0) {
-        const saved = await AppEnv.getInstance().getKeyStore().load(KEY_ALIAS_OPENAI);
-        key = saved ?? '';
-      }
-      if (this.draftBaseUrl.trim().length === 0) {
-        throw new Error('请填写 Base URL');
-      }
-      if (key.length === 0) {
-        throw new Error('请填写 API Key');
-      }
-      translator.setConfig(new OpenAiConfig(this.draftBaseUrl.trim(), key, 
-this.draftModel.trim()));
-      const models = await translator.listModels();
-      this.testOk = true;
-      this.testMessage = models.length > 0
-        ? `连接成功：端点返回 ${models.length} 个模型`
-        : '连接成功：端点可达（未返回模型列表）';
-    } catch (e) {
-      const err = e as Error;
-      this.testOk = false;
-      this.testMessage = `连接失败：${err !== undefined && err.message !== undefined ? err.message : 
-e}`;
-      Log.warn(TAG, `test connection failed: ${this.testMessage}`);
-    }
-    this.testing = false;
-  }
-
-  private async saveConfig(): Promise<void> {
-    try {
-      const base = this.draftBaseUrl.trim();
-      const model = this.draftModel.trim();
-      if (base.length === 0) {
-        this.testMessage = '请填写 Base URL';
-        return;
-      }
-      if (model.length === 0) {
-        this.testMessage = '请填写模型名';
-        return;
-      }
-      if (this.draftKey.trim().length > 0) {
-        await AppEnv.getInstance().getKeyStore().save(KEY_ALIAS_OPENAI, this.draftKey.trim());
-      }
-      await SettingsRepository.set(SettingsKeys.OPENAI_BASE_URL, base);
-      await SettingsRepository.set(SettingsKeys.OPENAI_MODEL, model);
-      await SettingsRepository.set(SettingsKeys.API_PROVIDER, this.draftProvider);
-      await SettingsRepository.set(SettingsKeys.ENGINE_TYPE, 1);
-      // 同步运行时引擎实例。
-      const translator = AppEnv.getInstance().getOpenAiTranslator();
-      const savedKey = await AppEnv.getInstance().getKeyStore().load(KEY_ALIAS_OPENAI);
-      if (translator !== undefined) {
-        translator.setConfig(new OpenAiConfig(base, savedKey ?? '', model));
-      }
-      this.engineType = 1;
-      this.provider = this.draftProvider;
-      this.baseUrl = base;
-      this.model = model;
-      this.hasKey = savedKey !== undefined && savedKey.length > 0;
-      this.showConfig = false;
-      this.flash(`已保存 ${this.providerName(this.draftProvider)} 配置`);
-    } catch (e) {
-      this.testMessage = `保存失败：${e}`;
-    }
-  }
-
-  private isWide(): boolean {
-    return this.sizeClass === WindowSizeClass.LG;
-  }
-
-  @Builder
-  statusBadge(pp: EngineBadgeParams) {
-    Text(pp.status.text)
-      .fontSize(ThemeTokens.FONT_SMALL)
-      .fontColor(pp.status.color)
-      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-      .borderRadius(ThemeTokens.RADIUS_PILL)
-      .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-  }
-
-  @Builder
-  engineRow(pp: EngineRowParams) {
-    Row({ space: 12 }) {
-      Column() {
-        Image(pp.icon)
-          .width(20)
-          .height(20)
-          .fillColor(pp.active ? ThemeTokens.PRIMARY : ThemeTokens.TEXT_SECONDARY)
-      }
-      .width(38)
-      .height(38)
-      .borderRadius(ThemeTokens.RADIUS_SMALL)
-      .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-      .justifyContent(FlexAlign.Center)
-
-      Column({ space: 3 }) {
-        Row({ space: 8 }) {
-          Text(pp.title)
-            .fontSize(ThemeTokens.FONT_CAPTION)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(ThemeTokens.TEXT_PRIMARY)
-          if (pp.active) {
-            Text('当前默认')
-              .fontSize(10)
-              .fontColor(ThemeTokens.PRIMARY)
-              .padding({ left: 6, right: 6, top: 1, bottom: 1 })
-              .borderRadius(ThemeTokens.RADIUS_PILL)
-              .backgroundColor(ThemeTokens.SURFACE_VARIANT)
-          }
-        }
-        Text(pp.desc)
-          .fontSize(ThemeTokens.FONT_SMALL)
-          .fontColor(ThemeTokens.TEXT_HINT)
-          .lineHeight(16)
-          .maxLines(3)
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
-      this.statusBadge({ status: pp.status })
-    }
-    .width('100%')
-    .padding({ top: 10, bottom: 10 })
-    .alignItems(VerticalAlign.Center)
-    .borderRadius(ThemeTokens.RADIUS_SMALL)
-    .onClick(() => {
-      pp.onTap();
-    })
-  }
-
-  @Builder
-  configDialog() {
-      const httpRequest = http.createHttp();
-      resp = await httpRequest.request(url, options);
-      httpRequest.destroy();
-    } catch (e) {
-      throw this.classifyHttpError(e);
-    }
-    if (resp.responseCode >= 400) {
-      throw this.httpError(resp.responseCode, resp.result as string);
-    }
-    const parsed = JSON.parse(resp.result as string) as Record<string, Object>;
-    const data = parsed['data'] as Array<Record<string, Object>>;
-    const models: Array<string> = [];
-    if (data !== undefined && data !== null) {
-      for (const item of data) {
-        const id = item['id'] as string;
-        if (id !== undefined && id !== null && id.length > 0) {
-          models.push(id);
-        }
-      }
-    }
-    return models;
-  }
-
-  private requireConfig(): OpenAiConfig {
-    if (this.config.apiKey.trim().length === 0) {
-      throw new TranslateError(ErrorKind.BAD_CONFIG, '请先在引擎配置中填写 API Key');
-    }
-    if (this.config.model.trim().length === 0) {
-      throw new TranslateError(ErrorKind.BAD_CONFIG, '请先在引擎配置中选择或填写模型名');
-    }
-    if (this.config.baseUrl.trim().length === 0) {
-      throw new TranslateError(ErrorKind.BAD_CONFIG, '请先在引擎配置中填写 Base URL');
-    }
-    return this.config;
-  }
-
-  private chatEndpoint(baseUrl: string): string {
-    const trimmed = baseUrl.trim();
-    if (trimmed.endsWith('/chat/completions')) {
-      return trimmed;
-    }
-    return trimmed.endsWith('/') ? `${trimmed}chat/completions` : `${trimmed}/chat/completions`;
-  }
-
-  /**
-   * MVP-1 prompt (kept verbatim so page translation outcomes do not change).
-   * Stage-2 text translation always goes through complete() + PromptTemplates.
-   */
-  private legacyMessages(req: TranslateRequest, model: string, thinking: ThinkingMode): 
-Array<ChatMessage> {
-    const toLang = this.langName(req.to);
-    const fromLang = this.langName(req.from);
-    const system: ChatMessage = systemMessage(
-      `You are a professional translation engine. Translate the user's text into ${toLang}. 
-Output ONLY the translated text, without any explanation or quotes.`);
-    const user: ChatMessage = userMessage(req.from === 'auto'
-      ? req.text
-      : `Translate the following ${fromLang} text into ${toLang}:\n${req.text}`);
-    const out: Array<ChatMessage> = [system, user];
-    return out;
-  }
-
-  private buildBody(messages: Array<ChatMessage>, opts: CompletionOptions, stream: boolean): 
-string {
-    const body: ChatCompletionBody = {
-      model: this.config.model,
-      messages: messages,
-      max_tokens: opts.maxTokens,
-      temperature: opts.temperature,
-      stream: stream
-    };
-    if (opts.thinking === ThinkingMode.ON) {
-      const t: ThinkingPayload = { type: 'enabled' };
-      body.thinking = t;
-    } else if (opts.thinking === ThinkingMode.OFF) {
-      const t: ThinkingPayload = { type: 'disabled' };
-      body.thinking = t;
-    }
-    // AUTO deliberately sends NO thinking field: several gateways reject it.
-    return JSON.stringify(body);
-  }
-
-  /**
-   * POST with stream:true and incremental SSE consumption.
-   * Cross-chunk UTF-8 is handled inside SseParser's Utf8ChunkDecoder, so a
-   * multi-byte character split across two TCP chunks is never mangled.
-   */
-  private async runStream(body: string, onDelta: (delta: string) => void): Promise<string> {
-    const cfg = this.requireConfig();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${cfg.apiKey}`,
-      'Accept': 'text/event-stream'
-    };
-    const options: http.HttpRequestOptions = {
-      method: http.RequestMethod.POST,
-      header: headers,
-      extraData: body,
-      connectTimeout: CONNECT_TIMEOUT_MS,
-      readTimeout: READ_TIMEOUT_MS
-    };
-    const httpRequest = http.createHttp();
-    let result = '';
-    let sawSseEvent = false;
-    let rawBytes: Array<number> = [];
-    const parser = new SseParser({
-      onEvent: (data: string) => {
-        sawSseEvent = true;
-        const delta = this.extractDelta(data);
-        if (delta.length > 0) {
-          result += delta;
-          onDelta(delta);
-        }
-      },
-      onDone: () => {
-        sawSseEvent = true;
-      }
-    });
-    httpRequest.on('dataReceive', (chunk: ArrayBuffer) => {
-      const bytes = new Uint8Array(chunk);
-      for (let i = 0; i < bytes.length; i++) {
-        rawBytes.push(bytes[i]);
-      }
-      parser.push(chunk);
-    });
-    let streamEnded = false;
-    httpRequest.on('dataEnd', () => {
-      streamEnded = true;
-      parser.flush();
-    });
-    let respCode = -1;
-    try {
-      // requestInStream resolves with the HTTP status code once the body ends.
-      respCode = await httpRequest.requestInStream(this.chatEndpoint(cfg.baseUrl), options);
-    } catch (e) {
-      throw this.classifyHttpError(e);
-    } finally {
-      httpRequest.destroy();
-    }
-    if (respCode >= 400) {
-      throw this.httpError(respCode, this.rawText(rawBytes));
-    }
-    if (result.length > 0) {
-      return result;
-    }
-    // Server ignored stream:true (or plain JSON body): whole-body parse.
-    const whole = this.rawText(rawBytes);
-    if (!streamEnded) {
-      parser.flush();
-    }
-    if (sawSseEvent && whole.trim().length === 0) {
-      throw new TranslateError(ErrorKind.CONTENT, '模型未返回任何内容');
-    }
-    const content = this.parseCompletion(whole);
-    if (content.length > 0) {
-      onDelta(content);
-    }
-    return content;
-  }
-
-  /** Non-stream completion parse: choices[0].message.content. */
-  private parseCompletion(text: string): string {
-    const parsed = this.parseJson(text);
-    const err = this.serverError(parsed);
-    if (err !== undefined) {
-      throw new TranslateError(ErrorKind.ENGINE, err);
-    }
-    const choices = parsed['choices'] as Array<Record<string, Object>>;
-    if (choices === undefined || choices === null || choices.length === 0) {
-      throw new TranslateError(ErrorKind.CONTENT, '模型未返回翻译结果');
-    }
-    const message = choices[0]['message'] as Record<string, Object>;
-    if (message === undefined || message === null) {
-      throw new TranslateError(ErrorKind.CONTENT, '模型响应缺少 message 字段');
-    }
-    const content = (message['content'] as string) ?? '';
-    const trimmed = content.trim();
-    if (trimmed.length === 0) {
-      throw new TranslateError(ErrorKind.CONTENT, '模型返回了空译文');
-    }
-    return trimmed;
-  }
-
-  /** SSE chunk parse: choices[0].delta.content (may be absent/empty). */
-  private extractDelta(data: string): string {
-    const parsed = this.parseJson(data);
-    const choices = parsed['choices'] as Array<Record<string, Object>>;
-    if (choices === undefined || choices === null || choices.length === 0) {
-      return '';
-    }
-    const delta = choices[0]['delta'] as Record<string, Object>;
-    if (delta === undefined || delta === null) {
-      return '';
-    }
-    // Some providers stream reasoning_content separately — it must NOT be
-    // appended to the translation result.
-    const content = delta['content'] as string;
-    if (content === undefined || content === null) {
-      return '';
-    }
-    return content;
-  }
-
-  private parseJson(text: string): Record<string, Object> {
-    let parsed: Record<string, Object>;
-    try {
-      parsed = JSON.parse(text.trim()) as Record<string, Object>;
-    } catch (e) {
-      throw new TranslateError(ErrorKind.CONTENT, '服务端返回内容无法解析');
-    }
-    if (parsed === null || parsed === undefined) {
-      throw new TranslateError(ErrorKind.CONTENT, '服务端返回内容无法解析');
-    }
-    return parsed;
-  }
-
-  /** OpenAI-compatible {"error":{"message":"..."}} extraction (upstream). */
-  private serverError(parsed: Record<string, Object>): string | undefined {
-    const err = parsed['error'] as Record<string, Object>;
-    if (err === undefined || err === null) {
-      return undefined;
-    }
-    const message = (err['message'] as string) ?? '';
-    const type = (err['type'] as string) ?? 'unknown';
-    return `OpenAI API error (${type}): ${message}`;
-  }
-
-  private async postJson(url: string, apiKey: string, body: string, timeoutMs: number): 
-Promise<string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    };
-    const options: http.HttpRequestOptions = {
-      method: http.RequestMethod.POST,
-      header: headers,
-      extraData: body,
-      connectTimeout: CONNECT_TIMEOUT_MS,
-      readTimeout: timeoutMs,
-      expectDataType: http.HttpDataType.STRING
-    };
-    let resp: http.HttpResponse;
-    try {
-      const httpRequest = http.createHttp();
-      resp = await httpRequest.request(url, options);
-      httpRequest.destroy();
-    } catch (e) {
-      throw this.classifyHttpError(e);
-    }
-    if (resp.responseCode >= 400) {
-      throw this.httpError(resp.responseCode, resp.result as string);
-    }
-    return resp.result as string;
-  }
-
-  /** Classify HTTP status into readable TranslateError (US-8 场景4). */
-  private httpError(code: number, body: string): TranslateError {
-    let serverMessage = '';
-    try {
-      const parsed = JSON.parse(body) as Record<string, Object>;
-      const err = parsed['error'] as Record<string, Object>;
-      if (err !== undefined && err !== null) {
-        const m = err['message'] as string;
-        if (m !== undefined && m !== null) {
-          serverMessage = m;
-        }
-      }
-    } catch (e) {
-      // Non-JSON body (gateway HTML etc.) — fall back to raw snippet.
-    }
-    if (serverMessage.length === 0) {
-      serverMessage = body.length > 200 ? body.substring(0, 200) : body;
-    }
-    if (code === 401 || code === 403) {
-      return new TranslateError(ErrorKind.AUTH, `鉴权失败（HTTP ${code}）：API Key 
-无效或无权限。${serverMessage}`);
-    }
-    if (code === 429) {
-      return new TranslateError(ErrorKind.RATE_LIMIT, `请求过于频繁（HTTP 429）：${serverMessage}`);
-    }
-    if (code === 404) {
-      return new TranslateError(ErrorKind.BAD_CONFIG,
-        `接口不存在（HTTP 404）：请检查 Base URL 是否包含正确的 API 版本路径。/v1。${serverMessage}`);
-    }
-    if (code === 400) {
-      return new TranslateError(ErrorKind.BAD_CONFIG, `请求被拒绝（HTTP 400）：${serverMessage}`);
-    }
-    if (code === 408 || code === 504) {
-      return new TranslateError(ErrorKind.TIMEOUT, `服务端超时（HTTP ${code}）：${serverMessage}`);
-    }
-    if (code >= 500) {
-      return new TranslateError(ErrorKind.ENGINE, `服务端故障（HTTP ${code}）：${serverMessage}`);
-    }
-    return new TranslateError(ErrorKind.ENGINE, `服务端错误（HTTP ${code}）：${serverMessage}`);
-  }
-
-  private rawBytesToText(bytes: Array<number>): Uint8Array {
-    const out: Uint8Array = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) {
-      out[i] = bytes[i];
-    }
-    return out;
-  }
-
-  private rawText(bytes: Array<number>): string {
-    if (bytes.length === 0) {
-      return '';
-    }
-    const decoder = util.TextDecoder.create('utf-8');
-    return decoder.decodeToString(this.rawBytesToText(bytes));
-  }
-
-  private langName(code: string): string {
-    const map: Record<string, string> = {
-      'auto': 'auto-detected language',
-      'zh': 'Simplified Chinese',
-      'zh-Hans': 'Simplified Chinese',
-      'zh-Hant': 'Traditional Chinese',
-      'ja': 'Japanese',
-      'ko': 'Korean',
-      'en': 'English',
-      'fr': 'French',
-      'de': 'German',
-      'es': 'Spanish',
-      'ru': 'Russian',
-      'it': 'Italian',
-      'pt': 'Portuguese',
-      'th': 'Thai',
-      'vi': 'Vietnamese',
-      'id': 'Indonesian',
-      'ar': 'Arabic'
-    };
-    const name = map[code];
-    if (name !== undefined) {
-      return name;
-    }
-    return code;
-  }
-
-  /** Map @ohos.net.http / libcurl failures into readable TranslateError kinds. */
-  private classifyHttpError(e: Object): TranslateError {
-    const err = e as BusinessError;
-    const code: number = err.code;
-    if (code === 2300028) {
-      return new TranslateError(ErrorKind.TIMEOUT, '请求超时：网络较慢或服务端无响应，请重试');
-    }
-    if (code === 2300006 || code === 2300007 || code === 2300005) {
-      return new TranslateError(ErrorKind.NETWORK, `无法连接服务器（${code}）：请检查网络与 Base URL`);
-    }
-    if (code === 2300060 || code === 2300058) {
-      return new TranslateError(ErrorKind.NETWORK, `安全连接失败（${code}）：证书校验或代理异常`);
-    }
-    if (code !== undefined && code >= 2300000 && code < 2301000) {
-      return new TranslateError(ErrorKind.NETWORK, `网络错误（${code}）：${err.message ?? ''}`);
-    }
-    return new TranslateError(ErrorKind.NETWORK, `网络请求失败：${err.message ?? '未知错误'}`);
-  }
-}
-// ==================== 文件：coretranslate/src/main/ets/openai/OpenAiTypes.ets ====================
-/**
- * Shared OpenAI-compatible chat types (stage 2 / S107).
- *
- * The translator used to build its own prompt internally and expose only
- * translate(text). Stage 2 needs the *prompt layer* to live in entry
- * (PromptTemplates: manga / novel / text / chat), so the engine now also
- * accepts an explicit messages array. These types are the contract between
- * the two layers and are intentionally free of any prompt text.
- */
-
-/**
- * Thinking-mode tri-state (preference 'translate_thinking_mode'):
- *  · OFF  — force thinking off  → request body carries thinking:{type:'disabled'}
- *  · AUTO — follow the model default → no thinking field at all; the prompt
- *           adds a *brief*-reasoning constraint only for known reasoning models
- *  · ON   — force thinking on   → thinking:{type:'enabled'}
- */
-export enum ThinkingMode {
-  OFF = 0,
-  AUTO = 1,
-  ON = 2
-}
-
-/** Normalise anything persisted into a valid ThinkingMode. */
-export function normalizeThinkingMode(raw: number): ThinkingMode {
-  if (raw === ThinkingMode.OFF) {
-    return ThinkingMode.OFF;
-  }
-  if (raw === ThinkingMode.ON) {
-    return ThinkingMode.ON;
-  }
-  return ThinkingMode.AUTO;
-}
-
-export function thinkingModeLabel(mode: ThinkingMode): string {
-  if (mode === ThinkingMode.OFF) {
-    return '关闭';
-  }
-  if (mode === ThinkingMode.ON) {
-    return '开启';
-  }
-  return '自动';
-}
-
-/** One chat/completions message. */
-export interface ChatMessage {
-  role: string;
-  content: string;
-}
-
-export function makeChatMessage(role: string, content: string): ChatMessage {
-  const m: ChatMessage = { role: role, content: content };
-  return m;
-}
-
-export function systemMessage(content: string): ChatMessage {
-  return makeChatMessage('system', content);
-}
-
-export function userMessage(content: string): ChatMessage {
-  return makeChatMessage('user', content);
-}
-
-export function assistantMessage(content: string): ChatMessage {
-  return makeChatMessage('assistant', content);
-}
-
-/**
- * Per-call sampling / reasoning options. Defaults mirror the MVP-1 engine
- * (temperature 0.3, 1000 tokens) so existing call sites behave identically.
- */
-export class CompletionOptions {
-  temperature: number = 0.3;
-  maxTokens: number = 1000;
-  thinking: ThinkingMode = ThinkingMode.AUTO;
-}
-
-export function makeCompletionOptions(temperature: number, maxTokens: number,
-  thinking: ThinkingMode): CompletionOptions {
-  const o = new CompletionOptions();
-  o.temperature = clampTemperature(temperature);
-  o.maxTokens = maxTokens > 0 ? maxTokens : 1000;
-  o.thinking = thinking;
-  return o;
-}
-
-/** Clamp temperature into the OpenAI-accepted range (0.0 – 2.0). */
-export function clampTemperature(value: number): number {
-  if (Number.isNaN(value)) {
-    return 0.3;
-  }
-  if (value < 0) {
-    return 0;
-  }
-  if (value > 2) {
-    return 2;
-  }
-  return value;
-}
-
-/**
- * Heuristic: does the model name look like a reasoning ("thinking") model?
- * Used by AUTO mode to append a *short*-reasoning constraint, and by the UI to
- * warn that translation will be slower. Deliberately substring based: the model
- * naming space of every vendor changes faster than any allow-list.
- */
-export function isReasoningModel(model: string): boolean {
-  const m = model.toLowerCase();
-  const hints: Array<string> = [
-    '-reasoner', 'reasoner', 'reasoning', 'thinking', 'qwq', 'o1-', 'o3-', 'o4-',
-    'deepseek-r1', '-r1', 'glm-z1', 'glm-z', 'seed-1-6-thinking', 'magistral'
-  ];
-  for (const h of hints) {
-    if (m.indexOf(h) >= 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/** Short human-readable model family for the thinking-mode hint. */
-export function describeThinking(mode: ThinkingMode, model: string): string {
-  if (mode === ThinkingMode.OFF) {
-    return '思考模式：关闭（最快，兼容所有模型）';
-  }
-  if (mode === ThinkingMode.ON) {
-    return '思考模式：开启（更准，但更慢更费 token）';
-  }
-  if (isReasoningModel(model)) {
-    return '思考模式：自动（推理模型，已加简短思考约束）';
-  }
-  return '思考模式：自动（跟随模型默认）';
-}
-// ==================== 文件：coretranslate/src/main/ets/openai/SseParser.ets ====================
-import { util } from '@kit.ArkTS';
-
-/**
- * Incremental UTF-8 chunk decoder: only decodes COMPLETE byte sequences,
- * keeping a split multi-byte tail for the next chunk (plan: SSE with
- * cross-chunk UTF-8 safety). Unit-tested via entry/src/test.
- */
-export class Utf8ChunkDecoder {
-  private pending: Array<number> = [];
-  private decoder: util.TextDecoder = util.TextDecoder.create('utf-8');
-
-  /** Feed a chunk; returns the safely-decodable text prefix. */
-  push(chunk: ArrayBuffer): string {
-    const bytes = new Uint8Array(chunk);
-    for (let i = 0; i < bytes.length; i++) {
-      this.pending.push(bytes[i]);
-    }
-    let complete = 0;
-    let i = 0;
-    while (i < this.pending.length) {
-      const b = this.pending[i];
-      let len = 1;
-      if (b >= 0xF0 && b <= 0xF7) {
-        len = 4;
-      } else if (b >= 0xE0 && b <= 0xEF) {
-        len = 3;
-      } else if (b >= 0xC0 && b <= 0xDF) {
-        len = 2;
-      } else if (b >= 0x80 && b <= 0xBF) {
-        // Stray continuation byte: treat as one unit to avoid stalls.
-        len = 1;
-      }
-      if (i + len > this.pending.length) {
-        break;
-      }
-      i += len;
-      complete = i;
-    }
-    if (complete === 0) {
-      return '';
-    }
-    const ready: Uint8Array = new Uint8Array(complete);
-    for (let k = 0; k < complete; k++) {
-      ready[k] = this.pending[k];
-    }
-    const rest: Array<number> = [];
-    for (let k = complete; k < this.pending.length; k++) {
-      rest.push(this.pending[k]);
-    }
-    this.pending = rest;
-    return this.decoder.decodeToString(ready);
-  }
-
-  /** Decode any remaining bytes (end of stream). */
-  flush(): string {
-    if (this.pending.length === 0) {
-      return '';
-    }
-    const ready: Uint8Array = new Uint8Array(this.pending.length);
-    for (let k = 0; k < this.pending.length; k++) {
-      ready[k] = this.pending[k];
-    }
-    this.pending = [];
-    return this.decoder.decodeToString(ready);
-  }
-}
-
-/** SSE consumer callbacks. */
-export interface SseCallbacks {
-  /** One SSE event data payload (prefix stripped). */
-  onEvent: (data: string) => void;
-  /** Terminal [DONE] marker received. */
-  onDone: () => void;
-}
-
-/**
- * Server-Sent Events stream parser: buffers raw chunks, splits frames on
- * blank lines, extracts `data:` lines, fires onEvent per event and onDone
- * on `data: [DONE]` (plan D6 / unit tests).
- */
-export class SseParser {
-  private decoder: Utf8ChunkDecoder = new Utf8ChunkDecoder();
-  private textBuffer: string = '';
-  private dataLines: Array<string> = [];
-  private readonly callbacks: SseCallbacks;
-
-  constructor(callbacks: SseCallbacks) {
-    this.callbacks = callbacks;
-  }
-
-  /** Feed a raw network chunk. */
-  push(chunk: ArrayBuffer): void {
-    this.textBuffer += this.decoder.push(chunk);
-    this.processBuffer();
-  }
-
-  /** End of stream: flush decoders and any pending event. */
-  flush(): void {
-    this.textBuffer += this.decoder.flush();
-    if (this.textBuffer.length > 0) {
-      this.consumeLine(this.textBuffer);
-      this.textBuffer = '';
-    }
-    this.emitEvent();
-  }
-
-  private processBuffer(): void {
-    let idx = this.textBuffer.indexOf('\n');
-    while (idx >= 0) {
-      let line = this.textBuffer.substring(0, idx);
-      this.textBuffer = this.textBuffer.substring(idx + 1);
-      if (line.endsWith('\r')) {
-        line = line.substring(0, line.length - 1);
-      }
-      this.consumeLine(line);
-      idx = this.textBuffer.indexOf('\n');
-    }
-  }
-
-  private consumeLine(line: string): void {
-    if (line.length === 0) {
-      this.emitEvent();
-      return;
-    }
-    if (line.startsWith('data:')) {
-      let data = line.substring(5);
-      if (data.startsWith(' ')) {
-        data = data.substring(1);
-      }
-      this.dataLines.push(data);
-    }
-    // Non-data lines (event:, id:, comments) are ignored.
-  }
-
-  private emitEvent(): void {
-    if (this.dataLines.length === 0) {
-      return;
-    }
-    const data = this.dataLines.join('\n');
-    this.dataLines = [];
-    if (data.trim() === '[DONE]') {
-      this.callbacks.onDone();
-      return;
-    }
-    this.callbacks.onEvent(data);
-  }
 }
 // ==================== 文件：entry/src/main/cpp/llamacpp_bridge.cpp ====================
 // MoyiOhos llama.cpp NAPI bridge (T041 / plan D11).

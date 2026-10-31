@@ -118,20 +118,35 @@ def collect_sources() -> list[Path]:
         if str(rel).startswith("entry/.cxx") or str(rel).startswith("entry/.preview"):
             continue
         files.append(p)
+    front = [
+        "entry/src/main/ets/service/PageTranslateService.ets",
+        "coreocr/src/main/ets/LocalOcrEngine.ets",
+        "corerender/src/main/ets/OverlayRenderer.ets",
+        "corerender/src/main/ets/LayoutEngine.ets",
+        "entry/src/main/ets/pages/ReaderPage.ets",
+        "entry/src/main/ets/service/PageImageCleaner.ets",
+        "entry/src/main/ets/service/ExportService.ets",
+    ]
     def key(p: Path) -> tuple:
         rel = str(p.relative_to(ROOT))
-        priority = 0
+        if rel in front:
+            return (0, front.index(rel), rel)
+        # 最后一页必须是完整模块：把 ocr_bridge.cpp 放最后，作为源程序结尾。
+        if rel.endswith("entry/src/main/cpp/ocr_bridge.cpp"):
+            return (99, 0, rel)
+        if rel.endswith("entry/src/main/cpp/llamacpp_bridge.cpp"):
+            return (98, 0, rel)
         if rel.startswith("entry/src/main/ets/entryability"):
-            priority = 1
-        elif rel.startswith("entry/src/main/ets/pages"):
-            priority = 2
-        elif rel.startswith("entry/src/main/ets/"):
-            priority = 3
-        elif rel.startswith("core"):
-            priority = 4
-        elif rel.endswith(".cpp") or rel.endswith(".h"):
-            priority = 5
-        return (priority, rel)
+            return (1, 0, rel)
+        if rel.startswith("entry/src/main/ets/pages"):
+            return (2, 0, rel)
+        if rel.startswith("entry/src/main/ets/"):
+            return (3, 0, rel)
+        if rel.startswith("core"):
+            return (4, 0, rel)
+        if rel.endswith(".cpp") or rel.endswith(".h"):
+            return (5, 0, rel)
+        return (6, 0, rel)
     return sorted(files, key=key)
 
 
@@ -173,11 +188,11 @@ def write_source_docx(lines: list[str], out_docx: Path, out_txt: Path) -> None:
     add_header_footer(doc, SOFTWARE_NAME + " " + VERSION + "  源程序鉴别材料")
     style = doc.styles["Normal"]
     style.font.name = "Consolas"
-    style.font.size = Pt(7.5)
+    style.font.size = Pt(8.2)
     style.paragraph_format.space_after = Pt(0)
     style.paragraph_format.space_before = Pt(0)
     style.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-    style.paragraph_format.line_spacing = Pt(9.5)
+    style.paragraph_format.line_spacing = Pt(11.0)
     total_pages = SAMPLE_PAGES
     for page in range(total_pages):
         start = page * PAGE_LINES
@@ -188,11 +203,11 @@ def write_source_docx(lines: list[str], out_docx: Path, out_txt: Path) -> None:
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-            p.paragraph_format.line_spacing = Pt(9.5)
+            p.paragraph_format.line_spacing = Pt(11.0)
             run = p.add_run(text if text else " ")
             run.font.name = "Consolas"
             run._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
-            run.font.size = Pt(7.5)
+            run.font.size = Pt(8.2)
             if text.startswith("//"):
                 run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
         if page < total_pages - 1:
@@ -389,6 +404,64 @@ def write_manual(out_docx: Path) -> None:
         add_bullet(doc, text)
     add_h1(doc, "附录 B 版本记录")
     add_para(doc, "V1.1.0：新增原生 det+rec、Noto Sans CJK、PDF 导出、术语表、气泡校对；具体变更见 CHANGELOG.md。")
+    add_h1(doc, "附录 C 操作步骤与界面说明")
+    add_para(doc, "本附录按用户实际使用顺序说明主要界面与按钮，便于审查人员核对软件功能与截图、源程序的一致性。")
+    add_h2(doc, "C.1 首次启动与书架")
+    add_para(doc, "首次启动进入书架页，底部为“书架 / 翻译 / 历史 / 我的”四个入口；大屏设备自动切换为左侧导航轨。")
+    add_para(doc, "书架页顶部显示“漫画书架”、漫画数量和“导入”按钮；点击“导入”后选择本地 ZIP/CBZ、图片目录或相册图片，导入完成后生成漫画卡片。")
+    add_para(doc, "漫画卡片显示封面、标题、页数和“未翻译 / 已翻译”状态；点击卡片进入阅读器。书架支持“最近”排序和按翻译状态筛选。")
+    add_para(doc, "“小说”页签用于导入 TXT/EPUB 等小说文件，导入后按章节生成目录。")
+    add_h2(doc, "C.2 阅读器")
+    add_para(doc, "阅读器页面中央为当前页图片，底部显示页码和进度；点击页面中央打开菜单，菜单包含“翻译本页”“导出ZIP”“目录”“设置”等入口。")
+    add_para(doc, "左右点击屏幕两侧可翻页；点击左右边缘的区域宽度、翻页方向、动画效果可在阅读设置中调整。")
+    add_para(doc, "阅读设置支持左到右、右到左、竖排整页、连续 Webtoon 四种阅读流，以及背景色、反色、灰度、亮度、对比度、字体大小、行距和横竖排。")
+    add_para(doc, "“目录”打开缩略图网格，可跳转到任意页；“设置”打开阅读参数面板；参数保存在本机，下次打开继续生效。")
+    add_h2(doc, "C.3 翻译本页")
+    add_para(doc, "在阅读器菜单点击“翻译本页”，软件依次执行页面解码、OCR、翻译和保存。进度条按阶段显示“解码页面”“识别文字”“翻译 x/y 行”“保存”。")
+    add_para(doc, "OCR 可选择系统 Core Vision 或本地 PP-OCRv6；本地模型需先在“设置 → OCR”下载。翻译引擎可选择免 Key 的必应、OpenAI 兼容 API 或本地 llama.cpp。")
+    add_para(doc, "翻译完成后，译文按页面坐标覆盖到原图；合并气泡内的多行译文会按气泡整体排版。译文块支持自动字号、横竖排和逐块黑白字/描边。")
+    add_h2(doc, "C.4 气泡校对")
+    add_para(doc, "对未合并的单行气泡长按，弹出“校对译文”对话框；输入框显示当前译文，点击“保存”后更新本页翻译结果并立即重绘，点击“取消”不修改。")
+    add_para(doc, "合并气泡暂不支持逐行编辑；需要修改时先关闭气泡合并或重新翻译该页。")
+    add_h2(doc, "C.5 导出")
+    add_para(doc, "点击“导出ZIP”打开导出模式：仅原文、仅译文、双语对照。仅原文直接归集原图；仅译文合成译文页；双语对照按页序交替原文和译文页。")
+    add_para(doc, "点击“导出 PDF”将译文合成页写入 PDF，保存到应用文件目录，完成提示会显示路径。PDF 导出依赖系统 PDF Kit；不支持时改用 ZIP。")
+    add_h2(doc, "C.6 术语表与翻译记忆")
+    add_para(doc, '路径为“设置 → 翻译 → 术语表”。点击“导入”选择 JSON 文件，格式为数组，每项包含 s（原文）和 t（译文），例如 [{"s":"原文","t":"译文"}]。')
+    add_para(doc, "翻译前按最长优先替换术语；页翻译完成后自动写入翻译记忆，最多保留 2000 条，重复原文可直接复用译文。点击“清空”删除术语表。")
+    add_h2(doc, "C.7 本地模型")
+    add_para(doc, "本地 OCR：设置 → OCR → 本地 PP-OCRv6，点击“下载”自动下载检测和识别模型并启用；页面显示“已下载”和文件路径。")
+    add_para(doc, "本地翻译：模型管理导入 .gguf 文件，应用会复制到沙箱；导入成功后可在翻译设置选择本地 llama.cpp。模型不随安装包分发。")
+    add_h2(doc, "C.8 常见提示与限制")
+    add_para(doc, "图片加载失败时检查文件是否被移动或删除，重新导入；OCR 无结果时确认模型已下载，复杂背景或超大框会被过滤；翻译失败时检查网络、API Key 或模型路径。")
+    add_para(doc, "软件不内置漫画/小说内容，用户应仅导入有权使用的内容；AI 翻译结果可能存在错误，导出或公开传播前应人工校对。")
+    add_h1(doc, "附录 D 软件设计说明")
+    add_h2(doc, "D.1 总体架构")
+    add_para(doc, "软件采用 HarmonyOS Stage 模型和 HAR 多模块架构。entry 模块负责应用入口、页面、交互、数据访问与系统能力；commons 提供主题、断点、日志、路径等公共能力。")
+    add_para(doc, "coremodel 定义漫画、小说、页面、翻译结果、下载任务等数据模型；coreocr 封装系统 OCR、本地 PP-OCRv6 和原生 ONNX Runtime 桥；coretranslate 封装在线翻译服务与本地 llama.cpp；corerender 负责覆盖层排版与 Canvas 绘制；corenovel 负责 TXT/EPUB/ZIP-HTML 解析。")
+    add_h2(doc, "D.2 模块与主要功能")
+    add_para(doc, "entry/pages：Index、ShelfPage、ReaderPage、SettingsPage、AboutPage 等页面；entry/service：PageTranslateService、BatchTranslateService、ExportService、GlossaryService、OcrRecService 等服务。")
+    add_para(doc, "entry/data：MangaRepository、PageRepository、SettingsRepository、DownloadRepository 等 RDB/Preferences 访问层；entry/viewmodel：ReaderViewModel、ShelfViewModel 等状态与业务编排。")
+    add_para(doc, "coreocr/LocalOcrEngine：页面解码、det 预处理、连通域检测、rec 识别；entry/cpp/ocr_bridge.cpp：通过 ONNX Runtime C API 在 TaskPool 中运行 det/rec。")
+    add_para(doc, "coretranslate：引擎注册、OpenAI 兼容请求、必应翻译、本地 llama.cpp NAPI；corerender：LayoutEngine、OverlayRenderer、PageOverlay；corenovel：TxtParser、EpubParser、ZipHtmlParser。")
+    add_h2(doc, "D.3 数据处理流程")
+    add_para(doc, "漫画翻译主流程：导入 → 页面记录 → 阅读器解码图片 → OCR 检测/识别 → 文本行按空间位置分组 → 翻译引擎生成译文 → 页内缓存/翻译记忆 → PageTranslation 落库 → 覆盖层排版绘制 → 导出。")
+    add_para(doc, "小说翻译主流程：导入 → 解析章节 → 分页 → 段落切分 → 逐段翻译 → 结果缓存 → 阅读器分页显示/导出。")
+    add_para(doc, "导出流程：读取页序和渲染设置 → 合成原文/译文页 → 写入暂存目录 → ZIP 或 PDF → 保存选择器/应用目录 → 清理暂存。")
+    add_h2(doc, "D.4 关键算法")
+    add_para(doc, "OCR 检测：图片按长边 768 缩放，按 32 对齐；3x3 可分离膨胀连接笔画；连通域得到轴对齐框；按面积比例过滤整页大框和单字大框；相近框合并。")
+    add_para(doc, "OCR 识别：按框裁剪并 pad 2 像素，缩放到高 48、宽 32 对齐，归一化到 [-1,1]；rec 输出按 CTC 贪心解码，去除 blank 和连续重复。")
+    add_para(doc, "气泡分组：按垂直间距不超过上一行高度 0.8 倍、水平重叠超过最小宽度 25%、每组最多 4 行/600 字符分组；本地 llama 每组生成一次，再按行拆分，失败回退逐行。")
+    add_para(doc, "覆盖排版：以页面像素坐标建立 DisplayRect，LayoutEngine 按气泡宽高计算字号与换行；OverlayRenderer 按块绘制背景、描边、文字；逐块文本颜色来自去字底图边缘亮度采样。")
+    add_h2(doc, "D.5 接口与数据")
+    add_para(doc, "页面翻译接口：PageTranslateService.run(page, options, onProgress)；输出 PageTranslation（pageId、translations、boxes、status）。")
+    add_para(doc, "OCR 接口：OcrService.recognize/recognizeLocal；原生接口：initDet、initRec、detectBoxes、recognizeBoxes。")
+    add_para(doc, "翻译接口：Translator.translate(TranslateRequest)；引擎注册表按 EngineType 选择必应、OpenAI 兼容或本地 llama.cpp。")
+    add_para(doc, "数据表：manga、manga_page、page_translation、text_translation、download_task；图片、清理底图、翻译记忆、术语表存放在应用沙箱。")
+    add_h2(doc, "D.6 异常处理与边界")
+    add_para(doc, "OCR 模型未下载、模型文件损坏、ONNX 初始化失败时回退系统 OCR；网络翻译失败时保留原文并记录失败行；本地模型路径无效时提示重新导入。")
+    add_para(doc, "页面过大时 OCR 限制长边并过滤异常框；导出合成失败时回退原图并计数；PDF Kit 不可用时提示改用 ZIP；存储空间不足时提示清理缓存。")
+    add_para(doc, "软件不上传整本漫画；在线翻译仅发送待翻译文本；本地模式图片和文本不离开设备。")
     props = doc.core_properties
     props.title = SOFTWARE_NAME + " " + VERSION + " 软件说明书"
     props.author = APPLICANT
