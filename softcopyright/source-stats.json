@@ -1,0 +1,8 @@
+{
+  "software": "星译漫画小说智能翻译软件",
+  "version": "V1.1.0",
+  "source_files": 133,
+  "total_lines_before_trim": 39061,
+  "sample_lines": 3000,
+  "sample_pages": 60
+}
